@@ -5,16 +5,16 @@ requires = [
 ]
 
 [project]
-name = "aa-example-plugin"
-description = "Example Plugin for Alliance Auth (GitHub Version)"
+name = "aa-campaign"
+description = "Z-Kill Campaigns for Alliance Auth"
 readme = "README.md"
 keywords = [
     "allianceauth",
-    "example",
+    "campaign",
 ]
 license = { file = "LICENSE" }
 authors = [
-    { name = "Peter Pfeufer", email = "develop@ppfeufer.de" },
+    { name = "BioBrute", email = "broodlk@gmail.com" },
 ]
 requires-python = ">=3.10,<3.14"
 classifiers = [
@@ -38,14 +38,15 @@ dynamic = [
 ]
 dependencies = [
     "allianceauth>=4.3.1,<5",
+    "django-eveuniverse",
 ]
-urls.Changelog = "https://github.com/ppfeufer/aa-example-plugin/blob/master/CHANGELOG.md"
-urls.Tracker = "https://github.com/ppfeufer/aa-example-plugin/issues"
+urls.Changelog = "https://github.com/BroodLK/aa-campaign/blob/master/CHANGELOG.md"
+urls.Tracker = "https://github.com/BroodLK/aa-campaign/issues"
 
 [tool.hatch.version]
-path = "example/__init__.py"
+path = "aacampaign/__init__.py"
 
 [tool.hatch.build]
 include = [
-    "/example",
+    "/aacampaign",
 ]

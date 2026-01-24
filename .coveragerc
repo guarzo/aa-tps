@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = example
+source = aacampaign
 
 [report]
 exclude_lines =

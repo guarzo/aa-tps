@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [In Development] - Unreleased
 
+### Added
+
+- Support for global (non-region specific) campaigns that track interactions between friendly and target entities regardless of location.
+- Campaigns can now combine location-based and entity-based tracking.
+
+- Z-Kill Campaign functionality:
+  - Models for Campaigns, Members, and Killmails.
+  - Daily task to fetch killmails from ZKillboard.
+  - Leaderboard and stats views.
+  - Admin interface for managing campaigns.
+
+### Changed
+
+- Renamed plugin from `aa-example-plugin` to `aa-campaign`
+
 ## [0.0.9] - 2024-06-16
 
 ### Removed
