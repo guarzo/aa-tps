@@ -84,73 +84,99 @@ def leaderboard_data(request: WSGIRequest, campaign_id: int) -> JsonResponse:
     draw = int(request.GET.get('draw', 1))
     start = int(request.GET.get('start', 0))
     length = int(request.GET.get('length', 10))
-    search_value = request.GET.get('search[value]', '')
+    search_value = request.GET.get('search[value]', '').lower()
 
-    # Queryset
-    queryset = campaign.killmails.filter(
+    # Fetch all friendly involvements on successful kills for this campaign
+    # We fetch enough fields to aggregate by User or individual Character
+    involvements = campaign.killmails.filter(
         is_loss=False,
         attackers__isnull=False
     ).values(
+        'id',
+        'total_value',
         'attackers__id',
-        'attackers__character_name'
-    ).annotate(
-        kills=Count('id'),
-        kill_value=Sum('total_value')
+        'attackers__character_name',
+        'attackers__character_ownership__user_id',
+        'attackers__character_ownership__user__profile__main_character__character_name'
     )
 
-    records_total = queryset.count()
+    # Grouping logic in Python to avoid double-counting kills/values
+    # when multiple alts of the same user are on the same killmail.
+    # groups key: ('U', user_id) or ('C', character_id)
+    groups = {}
 
+    for row in involvements:
+        uid = row['attackers__character_ownership__user_id']
+        cid = row['attackers__id']
+        kid = row['id']
+        val = float(row['total_value'])
+
+        if uid:
+            key = ('U', uid)
+            display_name = (
+                row['attackers__character_ownership__user__profile__main_character__character_name']
+                or row['attackers__character_name']
+            )
+        else:
+            key = ('C', cid)
+            display_name = row['attackers__character_name']
+
+        if key not in groups:
+            groups[key] = {
+                'character_name': display_name,
+                'kills_set': set(),
+                'kill_value': 0.0,
+            }
+
+        if kid not in groups[key]['kills_set']:
+            groups[key]['kills_set'].add(kid)
+            groups[key]['kill_value'] += val
+
+    # Convert aggregated data to list for DataTables processing
+    # We include the key to help with rank calculation later
+    data_list = []
+    for key, stats in groups.items():
+        stats['group_key'] = key
+        stats['kills'] = len(stats.pop('kills_set'))
+        data_list.append(stats)
+
+    # Filtering (search)
     if search_value:
-        queryset = queryset.filter(attackers__character_name__icontains(search_value))
+        data_list = [
+            d for d in data_list
+            if search_value in d['character_name'].lower()
+        ]
 
-    records_filtered = queryset.count()
+    records_filtered = len(data_list)
 
-    # Top 5 by value for badges (absolute rank)
-    top_5_ids = list(campaign.killmails.filter(
-        is_loss=False,
-        attackers__isnull=False
-    ).values(
-        'attackers__id'
-    ).annotate(
-        total_val=Sum('total_value')
-    ).order_by('-total_val')[:5].values_list('attackers__id', flat=True))
-
-    # Ordering
+    # Sorting
     order_column_index = request.GET.get('order[0][column]')
     order_dir = request.GET.get('order[0][dir]', 'desc')
 
-    columns = {
-        '0': 'attackers__character_name',
+    sort_columns = {
+        '0': 'character_name',
         '1': 'kills',
         '2': 'kill_value',
     }
-
-    sort_column = columns.get(order_column_index, 'kill_value')
-    if order_dir == 'desc':
-        sort_column = f"-{sort_column}"
-
-    queryset = queryset.order_by(sort_column)
+    sort_field = sort_columns.get(order_column_index, 'kill_value')
+    data_list.sort(key=lambda x: x[sort_field], reverse=(order_dir == 'desc'))
 
     # Paging
-    queryset = queryset[start:start + length]
+    paged_data = data_list[start:start + length]
 
-    data = []
-    for entry in queryset:
-        char_id = entry['attackers__id']
-        abs_rank = None
-        if char_id in top_5_ids:
-            abs_rank = top_5_ids.index(char_id) + 1
-
-        data.append({
-            'rank': abs_rank,
-            'character_name': entry['attackers__character_name'],
-            'kills': entry['kills'],
-            'kill_value': float(entry['kill_value']) if entry['kill_value'] else 0.0,
-        })
+    # Add rank metadata to paged data
+    # Icons 1-5 always on the first 5 rows of the table (rank 1-5 overall in current sort)
+    for i, entry in enumerate(paged_data):
+        entry.pop('group_key', None)
+        global_index = start + i
+        if global_index < 5:
+            entry['rank'] = global_index + 1
+        else:
+            entry['rank'] = None
 
     return JsonResponse({
         'draw': draw,
-        'recordsTotal': records_total,
+        'recordsTotal': len(groups),
         'recordsFiltered': records_filtered,
-        'data': data,
+        'data': paged_data,
     })

@@ -1,99 +1,98 @@
-# AA Campaign<a name="aa-campaign"></a>
+![PyPI - Version](https://img.shields.io/pypi/v/aa-campaign?style=for-the-badge)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/aa-campaign?style=for-the-badge)
+![PyPI - Format](https://img.shields.io/pypi/format/aa-campaign?style=for-the-badge)
+![python versions](https://img.shields.io/pypi/pyversions/aa-campaign?style=for-the-badge)
+![django versions](https://img.shields.io/badge/django-4.2%2B-blue?style=for-the-badge)
+![license](https://img.shields.io/badge/license-GPLv3-green?style=for-the-badge)
 
-AA Campaign is a plugin for [Alliance Auth](https://gitlab.com/allianceauth/allianceauth) (AA).
 
-![License](https://img.shields.io/badge/license-GPLv3-green)
-![python](https://img.shields.io/badge/python-3.10-informational)
-![django](https://img.shields.io/badge/django-4.2-informational)
-![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)
+> [!IMPORTANT]
+> AA Campaign requires a working installation of **Alliance Auth** and **django-eveuniverse**. Ensure these are set up before proceeding with the installation.
 
-______________________________________________________________________
+# AA Campaign
+AA Campaign is a plugin for **Alliance Auth** that allows you to create and track Z-Kill campaigns. Whether you're monitoring a specific system, a whole region, or targeting a rival alliance, AA Campaign pulls data directly from ZKillboard to provide real-time intelligence and performance tracking.
 
-<!-- mdformat-toc start --slug=github --maxlevel=6 --minlevel=1 -->
+## Index
 
 - [AA Campaign](#aa-campaign)
-  - [Features](#features)
-  - [Management Commands](#management-commands)
-    - [Pull Killmails](#pull-killmails)
-    - [Setup Periodic Tasks](#setup-periodic-tasks)
-  - [Installation](#installation)
-    - [Step 1: Install the Package](#step-1-install-the-package)
-    - [Step 2: Configure Alliance Auth](#step-2-configure-alliance-auth)
-    - [Step 3: Finalize Installation](#step-3-finalize-installation)
-  - [Updating](#updating)
-  - [Contribute](#contribute)
+  - [Core Requirements](#core-requirements)
+  - [Install Instructions](#install-instructions)
+- [Features](#features)
+  - [Campaign Dashboard](#campaign-dashboard)
+  - [Leaderboards](#leaderboards)
+  - [Recent Killmails](#recent-killmails)
+  - [Ship Class Statistics](#ship-class-statistics)
+- [Permissions](#permissions)
 
-<!-- mdformat-toc end -->
+## Core Requirements
+### The following AllianceAuth plugins are **_required_**:
 
-______________________________________________________________________
-
-## Features<a name="features"></a>
-
-- Create Z-Kill campaigns based on location (System, Region, Constellation) or global entity-based campaigns.
-- Track friendly entities (Characters, Corporations, Alliances) against target entities.
-- Automatically pull killmails from ZKillboard hourly.
-- Integrated leaderboard and stats page.
-- Efficiency calculation and kill/loss tracking.
-
-## Management Commands<a name="management-commands"></a>
-
-### Pull Killmails
-
-Manually trigger a data pull from ZKillboard. By default, this only pulls data for the current day.
-
-```bash
-python manage.py aa_campaign_pull --days 30
+```md
+allianceauth >= 4.3.1
+django-eveuniverse
 ```
 
-### Setup Periodic Tasks
-
-Automatically setup the hourly background task for pulling data.
-
+## Install Instructions
+After making sure to add the above prerequisite applications.
 ```bash
+source /home/allianceserver/venv/auth/bin/activate && cd /home/allianceserver/myauth/
+```
+```bash
+pip install aa-campaign
+```
+```bash
+vi myauth/settings/local.py
+```
+Add `aacampaign` to your `INSTALLED_APPS`. Ensure that `eveuniverse` is also present in `INSTALLED_APPS`.
+```bash
+python manage.py migrate && python manage.py collectstatic --noinput
 python manage.py aa_campaign_setup
 ```
-
-## Installation<a name="installation"></a>
-
-### Step 1: Install the Package<a name="step-1-install-the-package"></a>
-
-Install the app from GitHub:
-
+restart the things
+exit your venv
 ```bash
-pip install git+https://github.com/BroodLK/aa-campaign.git
+sudo supervisorctl restart myauth:
 ```
 
-### Step 2: Configure Alliance Auth<a name="step-2-configure-alliance-auth"></a>
+> [!TIP]
+> You can manually trigger a data pull using:
+> `python manage.py aa_campaign_pull --days 30`
 
-Add `aacampaign` to your `INSTALLED_APPS` in `local.py`.
 
-### Step 3: Finalize Installation<a name="step-3-finalize-installation"></a>
+# Features
 
-Run migrations, collect static files, and setup periodic tasks:
+## Campaign Dashboard
+### The AA Campaign dashboard provides a unified view of all active operations.
+Track your progress with a suite of analytical tools and live data feeds. Selecting a campaign displays a detailed breakdown of performance.
 
-```bash
-python manage.py migrate
-python manage.py collectstatic --noinput
-python manage.py aa_campaign_setup
-```
+- **Campaign Stats**
+  - Instant overview of total kills, losses, ISK value, and overall efficiency.
+- **Location Tracking**
+  - Campaigns can be locked to specific Solar Systems, Constellations, or Regions, or set to Global for entity-wide tracking.
+- **Member vs Target Tracking**
+  - Define exactly which friendly characters, corporations, or alliances are participating and which hostile entities are the targets.
 
-Restart your Alliance Auth services.
+## Leaderboards
+### Compete for the top spot with integrated character leaderboards.
+- Tracks individual performance within each campaign.
+- Ranks pilots by kill count and total ISK value.
+- Highlights top performers with rank icons for the top 5.
 
-## Updating<a name="updating"></a>
+## Recent Killmails
+### A detailed feed of all activity associated with your campaign.
+- Color-coded indicators for kills (green) and losses (red).
+- Direct links to ZKillboard for detailed analysis.
+- Summarized victim and final blow information for quick review.
 
-To update your installation, run:
+## Ship Class Statistics
+### Analyze the meta of your campaign.
+- Breakdown of kills and losses by ship class.
+- Helps identify what ships are being used effectively and where losses are occurring.
+- Interactive data tables for easy filtering and sorting.
 
-```bash
-pip install -U git+https://github.com/BroodLK/aa-campaign.git
-python manage.py migrate
-python manage.py collectstatic --noinput
-```
+# Permissions
 
-Restart your Alliance Auth services.
-
-## Contribute<a name="contribute"></a>
-
-If you've made a new app for AA, please consider sharing it with the rest of the
-community. For any questions on how to share your app, please contact the AA devs on
-their Discord. You find the current community creations
-[here](https://gitlab.com/allianceauth/community-creations).
+| Permission            | Description             |
+|-----------------------|-------------------------|
+| **basic_access**      | Can access this app     |
+| **manage_campaign**   | Can manage campaigns    |
