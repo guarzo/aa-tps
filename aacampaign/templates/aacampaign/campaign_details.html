@@ -91,10 +91,6 @@
                                         <td class="text-end text-success">{{ values.killed|default:0|intcomma }}</td>
                                         <td class="text-end text-danger">{{ values.lost|default:0|intcomma }}</td>
                                     </tr>
-                                {% empty %}
-                                    <tr>
-                                        <td colspan="3" class="text-center">{% translate "No data" %}</td>
-                                    </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
