@@ -28,7 +28,7 @@ AA Campaign is a plugin for **Alliance Auth** that allows you to create and trac
 ### The following AllianceAuth plugins are **_required_**:
 
 ```md
-allianceauth >= 4.3.1
+allianceauth >= 4.12
 django-eveuniverse
 ```
 
