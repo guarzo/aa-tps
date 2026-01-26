@@ -63,6 +63,45 @@ class TestZKillboardAPI(TestCase):
         self.assertEqual(kwargs['page'], 1)
         self.assertNotIn('past_seconds', kwargs)
 
+    @patch('aacampaign.tasks.fetch_from_zkill')
+    def test_pull_zkillboard_data_uses_past_seconds_for_small_values(self, mock_fetch):
+        # Setup a campaign and entity
+        campaign = Campaign.objects.create(
+            name="Test Campaign",
+            start_date=timezone.now() - timezone.timedelta(hours=1),
+            is_active=True
+        )
+        alliance = EveAllianceInfo.objects.create(alliance_id=99009902, alliance_name="Test Alliance", executor_corp_id=1)
+        CampaignMember.objects.create(campaign=campaign, alliance=alliance)
+
+        mock_fetch.return_value = []
+
+        # Call without past_seconds (should use default lookback which is 1h since campaign is new)
+        pull_zkillboard_data()
+
+        # Check that it called fetch_from_zkill with past_seconds
+        _, kwargs = mock_fetch.call_args_list[0]
+        self.assertIn('past_seconds', kwargs)
+        self.assertLessEqual(kwargs['past_seconds'], 3660) # 1h + small buffer
+        self.assertGreaterEqual(kwargs['past_seconds'], 3540)
+
+    @patch('aacampaign.tasks.fetch_from_zkill')
+    def test_pull_zkillboard_data_updates_last_run(self, mock_fetch):
+        # Setup a campaign
+        campaign = Campaign.objects.create(
+            name="Test Campaign",
+            start_date=timezone.now() - timezone.timedelta(hours=1),
+            is_active=True
+        )
+        mock_fetch.return_value = []
+
+        self.assertIsNone(campaign.last_run)
+
+        pull_zkillboard_data()
+
+        campaign.refresh_from_db()
+        self.assertIsNotNone(campaign.last_run)
+
 class TestCampaign(TestCase):
     def setUp(self):
         # Setup basic universe

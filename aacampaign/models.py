@@ -15,6 +15,7 @@ class Campaign(models.Model):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    last_run = models.DateTimeField(null=True, blank=True, default=None)
 
     systems = models.ManyToManyField(EveSolarSystem, blank=True, related_name='campaigns')
     regions = models.ManyToManyField(EveRegion, blank=True, related_name='campaigns')

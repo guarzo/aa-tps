@@ -69,6 +69,24 @@ def pull_zkillboard_data(past_seconds=None):
     # Collect all unique entities to pull for and their required lookback
     entities = {} # (entity_type, entity_id) -> min_start_date
     for campaign in active_campaigns:
+        # Determine how far back we need to pull for this campaign
+        if past_seconds:
+            # Explicit override
+            campaign_lookback = now - timezone.timedelta(seconds=past_seconds)
+        elif campaign.last_run is None:
+            # New campaign: pull from start_date
+            campaign_lookback = campaign.start_date
+            logger.info(f"Campaign {campaign.name} is new or never pulled, pulling from {campaign_lookback}")
+        else:
+            # Established campaign: pull from last 3 hours
+            # We use 3 hours to have some overlap and ensure no gaps if the task was slightly delayed.
+            campaign_lookback = now - timezone.timedelta(hours=3)
+            logger.debug(f"Campaign {campaign.name} is established, pulling from {campaign_lookback}")
+
+        # Never look back before the campaign actually started
+        if campaign_lookback < campaign.start_date:
+            campaign_lookback = campaign.start_date
+
         def add_entity(etype, eid, start_date):
             if (etype, eid) not in entities or start_date < entities[(etype, eid)]:
                 entities[(etype, eid)] = start_date
@@ -76,30 +94,31 @@ def pull_zkillboard_data(past_seconds=None):
         # Pull for members
         for member in campaign.members.all():
             if member.character:
-                add_entity('characterID', member.character.character_id, campaign.start_date)
+                add_entity('characterID', member.character.character_id, campaign_lookback)
             if member.corporation:
-                add_entity('corporationID', member.corporation.corporation_id, campaign.start_date)
+                add_entity('corporationID', member.corporation.corporation_id, campaign_lookback)
             if member.alliance:
-                add_entity('allianceID', member.alliance.alliance_id, campaign.start_date)
+                add_entity('allianceID', member.alliance.alliance_id, campaign_lookback)
 
         # Pull for targets
         for target in campaign.targets.all():
             if target.character:
-                add_entity('characterID', target.character.character_id, campaign.start_date)
+                add_entity('characterID', target.character.character_id, campaign_lookback)
             if target.corporation:
-                add_entity('corporationID', target.corporation.corporation_id, campaign.start_date)
+                add_entity('corporationID', target.corporation.corporation_id, campaign_lookback)
             if target.alliance:
-                add_entity('allianceID', target.alliance.alliance_id, campaign.start_date)
+                add_entity('allianceID', target.alliance.alliance_id, campaign_lookback)
 
         # Pull for locations to catch all engagements in relevant areas
         for system in campaign.systems.all():
-            add_entity('systemID', system.id, campaign.start_date)
+            add_entity('systemID', system.id, campaign_lookback)
         for constellation in campaign.constellations.all():
-            add_entity('constellationID', constellation.id, campaign.start_date)
+            add_entity('constellationID', constellation.id, campaign_lookback)
         for region in campaign.regions.all():
-            add_entity('regionID', region.id, campaign.start_date)
+            add_entity('regionID', region.id, campaign_lookback)
 
     if not entities:
+        active_campaigns.update(last_run=now)
         logger.info(f"No entities found to pull for in {active_campaigns.count()} active campaigns")
         return "No entities found"
 
@@ -108,47 +127,25 @@ def pull_zkillboard_data(past_seconds=None):
     # Pull killmails for each entity and process them
     processed_ids = set()
     campaign_killmails_count = 0
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     total_entities = len(entities)
     for i, ((entity_type, entity_id), min_start_date) in enumerate(entities.items(), 1):
-        if past_seconds:
-            # If explicit past_seconds provided, it overrides the campaign start date
-            min_start_date = timezone.now() - timezone.timedelta(seconds=past_seconds)
-        else:
-            # Default to pulling only today's data, but still respect campaign start date
-            if min_start_date < today_start:
-                min_start_date = today_start
+        seconds_to_pull = int((now - min_start_date).total_seconds())
+        logger.info(f"[{i}/{total_entities}] Discovery for {entity_type} {entity_id} from {min_start_date} ({seconds_to_pull}s ago)")
 
-        logger.info(f"[{i}/{total_entities}] Discovery for {entity_type} {entity_id} from {min_start_date}")
-
-        reached_min_date = False
-        curr_now = timezone.now()
-        curr_year = curr_now.year
-        curr_month = curr_now.month
-        start_year = min_start_date.year
-        start_month = min_start_date.month
-
-        while (curr_year > start_year) or (curr_year == start_year and curr_month >= start_month):
+        if seconds_to_pull < 172800: # 48 hours
+            # Use pastSeconds API for recent pulls - it's much faster
             page = 1
-            max_pages_per_month = 50
-            logger.debug(f"Pulling {entity_type} {entity_id} for {curr_year}-{curr_month:02d}")
-
-            while page <= max_pages_per_month:
-                # Be polite to zKillboard
-                if page > 1 or (curr_month != curr_now.month or curr_year != curr_now.year):
+            reached_min_date = False
+            while page <= 20: # Should be plenty
+                if page > 1:
                     time.sleep(1)
 
-                kms = fetch_from_zkill(entity_type, entity_id, page=page, year=curr_year, month=curr_month)
-                if kms is None:
-                    logger.error(f"Failed to fetch page {page} for {curr_year}-{curr_month:02d}. Skipping month.")
-                    break
-
+                kms = fetch_from_zkill(entity_type, entity_id, past_seconds=seconds_to_pull, page=page)
                 if not kms:
-                    logger.debug(f"No more killmails for {curr_year}-{curr_month:02d} at page {page}")
                     break
 
-                logger.info(f"Fetched page {page} ({len(kms)} kills) for {entity_type} {entity_id} ({curr_year}-{curr_month:02d})")
+                logger.info(f"Fetched page {page} ({len(kms)} kills) for {entity_type} {entity_id} using pastSeconds")
 
                 new_on_page = 0
                 for km in kms:
@@ -157,7 +154,6 @@ def pull_zkillboard_data(past_seconds=None):
                         processed_ids.add(km_id)
 
                         # Optimization: Identify campaigns that already have this killmail
-                        # to avoid redundant ESI calls in should_include_killmail
                         existing_campaign_ids = set(CampaignKillmail.objects.filter(
                             killmail_id=km_id,
                             campaign__in=active_campaigns
@@ -166,7 +162,6 @@ def pull_zkillboard_data(past_seconds=None):
                         campaigns_to_check = [c for c in active_campaigns if c.id not in existing_campaign_ids]
 
                         if not campaigns_to_check:
-                            # We already have this killmail for all possible active campaigns
                             continue
 
                         new_on_page += 1
@@ -177,27 +172,93 @@ def pull_zkillboard_data(past_seconds=None):
 
                 logger.info(f"Processed {new_on_page} unique killmails from page {page}")
 
-                # Check if we should continue paging this month
-                # Since results are usually desc, if the last km on page is older than min_start_date, we can stop
+                if len(kms) < 200: # Last page
+                    break
+
+                # Check if last km on page is older than min_start_date
                 last_km_time = get_killmail_time(kms[-1])
                 if last_km_time and last_km_time < min_start_date:
-                    reached_min_date = True
                     break
 
                 page += 1
+        else:
+            # Historical pull using year/month loop
+            reached_min_date = False
+            curr_now = now
+            curr_year = curr_now.year
+            curr_month = curr_now.month
+            start_year = min_start_date.year
+            start_month = min_start_date.month
 
-            if reached_min_date:
-                logger.info(f"Reached data older than {min_start_date}. Stopping for {entity_type} {entity_id}.")
-                break
+            while (curr_year > start_year) or (curr_year == start_year and curr_month >= start_month):
+                page = 1
+                max_pages_per_month = 50
+                logger.debug(f"Pulling {entity_type} {entity_id} for {curr_year}-{curr_month:02d}")
 
-            if page > max_pages_per_month:
-                logger.warning(f"Reached max pages ({max_pages_per_month}) for {curr_year}-{curr_month:02d}. Moving to next month.")
+                while page <= max_pages_per_month:
+                    # Be polite to zKillboard
+                    if page > 1 or (curr_month != curr_now.month or curr_year != curr_now.year):
+                        time.sleep(1)
 
-            # Decrement month
-            curr_month -= 1
-            if curr_month < 1:
-                curr_month = 12
-                curr_year -= 1
+                    kms = fetch_from_zkill(entity_type, entity_id, page=page, year=curr_year, month=curr_month)
+                    if kms is None:
+                        logger.error(f"Failed to fetch page {page} for {curr_year}-{curr_month:02d}. Skipping month.")
+                        break
+
+                    if not kms:
+                        logger.debug(f"No more killmails for {curr_year}-{curr_month:02d} at page {page}")
+                        break
+
+                    logger.info(f"Fetched page {page} ({len(kms)} kills) for {entity_type} {entity_id} ({curr_year}-{curr_month:02d})")
+
+                    new_on_page = 0
+                    for km in kms:
+                        km_id = km.get('killmail_id')
+                        if km_id and km_id not in processed_ids:
+                            processed_ids.add(km_id)
+
+                            # Optimization: Identify campaigns that already have this killmail
+                            existing_campaign_ids = set(CampaignKillmail.objects.filter(
+                                killmail_id=km_id,
+                                campaign__in=active_campaigns
+                            ).values_list('campaign_id', flat=True))
+
+                            campaigns_to_check = [c for c in active_campaigns if c.id not in existing_campaign_ids]
+
+                            if not campaigns_to_check:
+                                continue
+
+                            new_on_page += 1
+                            for campaign in campaigns_to_check:
+                                if should_include_killmail(campaign, km):
+                                    process_killmail(campaign, km)
+                                    campaign_killmails_count += 1
+
+                    logger.info(f"Processed {new_on_page} unique killmails from page {page}")
+
+                    # Check if we should continue paging this month
+                    last_km_time = get_killmail_time(kms[-1])
+                    if last_km_time and last_km_time < min_start_date:
+                        reached_min_date = True
+                        break
+
+                    page += 1
+
+                if reached_min_date:
+                    logger.info(f"Reached data older than {min_start_date}. Stopping for {entity_type} {entity_id}.")
+                    break
+
+                if page > max_pages_per_month:
+                    logger.warning(f"Reached max pages ({max_pages_per_month}) for {curr_year}-{curr_month:02d}. Moving to next month.")
+
+                # Decrement month
+                curr_month -= 1
+                if curr_month < 1:
+                    curr_month = 12
+                    curr_year -= 1
+
+    # Update last_run for all campaigns processed
+    active_campaigns.update(last_run=now)
 
     logger.info(f"Finished pulling ZKillboard data. Processed {campaign_killmails_count} campaign killmails. Task completed successfully.")
     return f"Processed {campaign_killmails_count} campaign killmails"
@@ -275,10 +336,11 @@ def fetch_from_zkill(entity_type, entity_id, past_seconds=None, page=None, year=
         url = f"https://zkillboard.com/api/{entity_type}/{entity_id}/"
         if year and month:
             url += f"year/{year}/month/{month}/"
-        if page:
-            url += f"page/{page}/"
-        else:
-            url += "page/1/"
+
+    if page:
+        url += f"page/{page}/"
+    else:
+        url += "page/1/"
 
     contact_email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'Unknown')
     headers = {
