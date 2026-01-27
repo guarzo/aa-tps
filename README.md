@@ -38,7 +38,7 @@ After making sure to add the above prerequisite applications.
 source /home/allianceserver/venv/auth/bin/activate && cd /home/allianceserver/myauth/
 ```
 ```bash
-pip install aa-campaign==0.1.1
+pip install aa-campaign==0.1.5
 ```
 ```bash
 vi myauth/settings/local.py
