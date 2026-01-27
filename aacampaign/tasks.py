@@ -11,21 +11,13 @@ from django.conf import settings
 from django.core.cache import cache
 from celery import shared_task
 from .models import Campaign, CampaignKillmail, CampaignMember, CampaignTarget
+from .esi import esi, call_result
 from allianceauth.eveonline.models import EveCharacter, EveCorporationInfo, EveAllianceInfo
 from eveuniverse.models import EveSolarSystem, EveEntity, EveType, EveConstellation, EveRegion
 from django.db import transaction
 from django.db.models import Q
 
 logger = logging.getLogger(__name__)
-
-# Reusable session for ESI calls with retry logic for 429/5xx errors
-_esi_session = requests.Session()
-_retries = Retry(
-    total=5,
-    backoff_factor=1,
-    status_forcelist=[429, 500, 502, 503, 504]
-)
-_esi_session.mount('https://', HTTPAdapter(max_retries=_retries))
 
 # Reusable session for zKillboard calls
 _zkill_session = requests.Session()
@@ -514,18 +506,14 @@ def fetch_from_zkill(entity_type, entity_id, past_seconds=None, page=None, year=
         return None
 
 def fetch_killmail_from_esi(killmail_id, killmail_hash):
-    url = f"https://esi.evetech.net/latest/killmails/{killmail_id}/{killmail_hash}/?datasource=tranquility"
-    contact_email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'Unknown')
-    headers = {
-        'User-Agent': f'Alliance Auth Campaign Plugin - Maintainer: {contact_email}',
-    }
     try:
-        # Be polite to ESI, especially during historical pulls
-        time.sleep(0.05)
         logger.debug(f"Fetching killmail {killmail_id} from ESI")
-        response = _esi_session.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        return response.json()
+        data, _ = call_result(
+            esi.client.Killmail.GetKillmailsKillmailIdKillmailHash,
+            killmail_id=killmail_id,
+            killmail_hash=killmail_hash
+        )
+        return data
     except Exception as e:
         logger.error(f"Error fetching killmail {killmail_id} from ESI: {e}")
         return None
@@ -768,11 +756,14 @@ def process_killmail(campaign, km_data, campaign_meta=None, context=None):
         if context and eid in context.get('resolved_names', {}):
             return context['resolved_names'][eid]
         try:
-            name = EveEntity.objects.get_or_create_esi(id=eid)[0].name
-            if context: context.setdefault('resolved_names', {})[eid] = name
-            return name
-        except Exception:
-            return "Unknown"
+            data, _ = call_result(esi.client.Universe.PostUniverseNames, ids=[eid])
+            if data:
+                name = data[0]['name']
+                if context: context.setdefault('resolved_names', {})[eid] = name
+                return name
+        except Exception as e:
+            logger.warning(f"Failed to resolve name for {eid}: {e}")
+        return "Unknown"
 
     # Is it a loss for our side?
     if campaign_meta and campaign.id in campaign_meta:

@@ -307,11 +307,9 @@ class TestCampaign(TestCase):
 
     @patch('aacampaign.tasks.EveType.objects.get_or_create_esi')
     @patch('aacampaign.tasks.EveCharacter.objects.create_character')
-    @patch('aacampaign.tasks.EveEntity.objects.get_or_create_esi')
-    def test_process_killmail(self, mock_get_or_create_esi, mock_create_char, mock_get_type):
-        mock_entity = MagicMock()
-        mock_entity.name = 'Resolved Name'
-        mock_get_or_create_esi.return_value = (mock_entity, True)
+    @patch('aacampaign.tasks.call_result')
+    def test_process_killmail(self, mock_call_result, mock_create_char, mock_get_type):
+        mock_call_result.return_value = ([{'name': 'Resolved Name'}], None)
         mock_create_char.return_value = self.char1
 
         mock_type = MagicMock()
@@ -341,11 +339,9 @@ class TestCampaign(TestCase):
 
     @patch('aacampaign.tasks.EveType.objects.get_or_create_esi')
     @patch('aacampaign.tasks.EveCharacter.objects.create_character')
-    @patch('aacampaign.tasks.EveEntity.objects.get_or_create_esi')
-    def test_process_killmail_corp_member(self, mock_get_or_create_esi, mock_create_char, mock_get_type):
-        mock_entity = MagicMock()
-        mock_entity.name = 'Resolved Name'
-        mock_get_or_create_esi.return_value = (mock_entity, True)
+    @patch('aacampaign.tasks.call_result')
+    def test_process_killmail_corp_member(self, mock_call_result, mock_create_char, mock_get_type):
+        mock_call_result.return_value = ([{'name': 'Resolved Name'}], None)
 
         mock_type = MagicMock()
         mock_type.eve_group.name = 'Test Group'
@@ -442,8 +438,8 @@ class TestGlobalCampaign(TestCase):
         }
 
         # This should NOT call ESI and should return True because it's in the DB
-        with patch('aacampaign.tasks._esi_session.get') as mock_get:
+        with patch('aacampaign.tasks.call_result') as mock_call:
             self.assertTrue(should_include_killmail(campaign, km_data))
-            mock_get.assert_not_called()
+            mock_call.assert_not_called()
             self.assertIn('killmail_time', km_data)
             self.assertEqual(km_data['solar_system_id'], system.id)

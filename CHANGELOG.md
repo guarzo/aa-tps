@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.6] - 2026-01-27
+
+### Changed
+
+- Proof of concept for campaign statistics completed, moved to OpenAPI.
+
 ## [0.1.5] - 2026-01-27
 
 ### Added
