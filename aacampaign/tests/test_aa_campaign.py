@@ -102,6 +102,156 @@ class TestZKillboardAPI(TestCase):
         campaign.refresh_from_db()
         self.assertIsNotNone(campaign.last_run)
 
+    @patch('aacampaign.tasks.cache')
+    @patch('aacampaign.tasks._pull_zkillboard_data_logic')
+    def test_pull_zkillboard_data_lock_behavior(self, mock_logic, mock_cache):
+        # 1. Test initial lock acquisition
+        mock_cache.add.return_value = True
+
+        pull_zkillboard_data()
+
+        # Should acquire lock for 2h (7200)
+        mock_cache.add.assert_called_with("aacampaign-pull-zkillboard-data-lock", True, 7200)
+        # Should delete lock in finally
+        mock_cache.delete.assert_called_with("aacampaign-pull-zkillboard-data-lock")
+
+        # 2. Test when already running
+        mock_cache.add.return_value = False
+        result = pull_zkillboard_data()
+        self.assertEqual(result, "Task already running")
+
+    @patch('aacampaign.tasks.cache')
+    @patch('aacampaign.tasks.fetch_from_zkill')
+    @patch('aacampaign.tasks.time.time')
+    def test_pull_zkillboard_data_timeout(self, mock_time, mock_fetch, mock_cache):
+        # Setup a campaign and entity to trigger the loop
+        campaign = Campaign.objects.create(
+            name="Test Campaign",
+            start_date=timezone.now() - timezone.timedelta(hours=1),
+            is_active=True
+        )
+        alliance = EveAllianceInfo.objects.create(alliance_id=99009902, alliance_name="Test Alliance", executor_corp_id=1)
+        CampaignMember.objects.create(campaign=campaign, alliance=alliance)
+
+        mock_cache.add.return_value = True
+        mock_fetch.return_value = []
+
+        # T=0 (start), T=7300 (loop iteration check - triggers timeout)
+        mock_time.side_effect = [0, 7300, 7300, 7300, 7300]
+
+        pull_zkillboard_data()
+
+        # Should NOT have called fetch due to timeout
+        self.assertEqual(mock_fetch.call_count, 0)
+
+    @patch('aacampaign.tasks.fetch_from_zkill')
+    def test_pull_zkillboard_data_optimization(self, mock_fetch):
+        # Setup a campaign with filters (targets and locations)
+        campaign = Campaign.objects.create(
+            name="Filtered Campaign",
+            start_date=timezone.now() - timezone.timedelta(days=1),
+            is_active=True
+        )
+
+        # Friendly member (should NOT be pulled because we have filters)
+        alliance_friendly = EveAllianceInfo.objects.create(alliance_id=1, alliance_name="Friendly Alliance", executor_corp_id=1)
+        CampaignMember.objects.create(campaign=campaign, alliance=alliance_friendly)
+
+        # Target (should be pulled)
+        alliance_target = EveAllianceInfo.objects.create(alliance_id=2, alliance_name="Target Alliance", executor_corp_id=2)
+        CampaignTarget.objects.create(campaign=campaign, alliance=alliance_target)
+
+        # Location (should be pulled)
+        region = EveRegion.objects.create(id=10, name="Target Region")
+        campaign.regions.add(region)
+
+        mock_fetch.return_value = []
+
+        pull_zkillboard_data()
+
+        # Should have called fetch for:
+        # 1. Target Alliance (allianceID, 2)
+        # 2. Target Region (regionID, 10)
+        # Should NOT have called for Friendly Alliance (allianceID, 1)
+
+        called_entities = [(args[0], args[1]) for args, _ in mock_fetch.call_args_list]
+        self.assertIn(('allianceID', 2), called_entities)
+        self.assertIn(('regionID', 10), called_entities)
+        self.assertNotIn(('allianceID', 1), called_entities)
+
+    @patch('aacampaign.tasks.fetch_from_zkill')
+    def test_pull_zkillboard_data_hierarchy_deduplication(self, mock_fetch):
+        # Global campaign (no filters)
+        campaign = Campaign.objects.create(
+            name="Global Campaign",
+            start_date=timezone.now() - timezone.timedelta(days=1),
+            is_active=True
+        )
+
+        # Alliance, Corp (in Alliance), Char (in Corp)
+        alliance = EveAllianceInfo.objects.create(alliance_id=100, alliance_name="A", executor_corp_id=101)
+        corp = EveCorporationInfo.objects.create(corporation_id=101, corporation_name="C", member_count=1, alliance=alliance)
+        char = EveCharacter.objects.create(character_id=1001, character_name="Ch", corporation_id=101, alliance_id=100)
+
+        CampaignMember.objects.create(campaign=campaign, alliance=alliance)
+        CampaignMember.objects.create(campaign=campaign, corporation=corp)
+        CampaignMember.objects.create(campaign=campaign, character=char)
+
+        mock_fetch.return_value = []
+
+        pull_zkillboard_data()
+
+        # Should only pull for the Alliance
+        called_entities = [(args[0], args[1]) for args, _ in mock_fetch.call_args_list]
+        self.assertIn(('allianceID', 100), called_entities)
+        self.assertNotIn(('corporationID', 101), called_entities)
+        self.assertNotIn(('characterID', 1001), called_entities)
+
+    @patch('aacampaign.tasks._zkill_session.get')
+    @patch('aacampaign.tasks.time.sleep')
+    @patch('aacampaign.tasks.time.time')
+    def test_zkill_get_rate_limiting(self, mock_time, mock_sleep, mock_get):
+        from aacampaign.tasks import _zkill_get
+        import aacampaign.tasks
+
+        # Reset the global tracker for deterministic test
+        aacampaign.tasks._last_zkill_call = 0
+
+        mock_response = MagicMock()
+        mock_get.return_value = mock_response
+
+        # First call at T=1000
+        mock_time.return_value = 1000.0
+        _zkill_get("https://zkillboard.com/api/test/")
+        self.assertEqual(mock_sleep.call_count, 0)
+
+        # Second call at T=1000.1 (only 100ms later)
+        mock_time.return_value = 1000.1
+        _zkill_get("https://zkillboard.com/api/test/")
+
+        # Should have slept for 0.4s to reach 500ms total gap
+        mock_sleep.assert_called_once()
+        # Use almost equal for float comparison if needed, but here it's exact subtraction
+        self.assertAlmostEqual(mock_sleep.call_args[0][0], 0.4)
+
+    @patch('aacampaign.tasks.cache')
+    def test_repair_campaign_killmails_lock(self, mock_cache):
+        from aacampaign.tasks import repair_campaign_killmails
+
+        # 1. Test acquisition
+        mock_cache.add.return_value = True
+
+        repair_campaign_killmails()
+
+        # Should use 7200s
+        mock_cache.add.assert_called_with("aacampaign-repair-campaign-killmails-lock", True, 7200)
+        mock_cache.delete.assert_called_with("aacampaign-repair-campaign-killmails-lock")
+
+        # 2. Test already running
+        mock_cache.add.return_value = False
+        result = repair_campaign_killmails()
+        self.assertEqual(result, "Task already running")
+
 class TestCampaign(TestCase):
     def setUp(self):
         # Setup basic universe
