@@ -58,6 +58,9 @@ sudo supervisorctl restart myauth:
 > You can manually trigger a data pull using:
 > `python manage.py aa_campaign_pull --days 30`
 
+> [!WARNING]
+> Running a long pull, or setting a campaign set far into the past can take an extremely long time.
+> This app is designed with politeness towards API first and foremost. The more data you pull, the longer it will take.
 
 # Features
 
