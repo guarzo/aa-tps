@@ -1,37 +1,10 @@
 # Change Log
 
-## [0.1.11] - 2026-01-27
+## [1.0.0] - 2026-01-28
 
 ### Fixed
 
-- Fixed bug where killmails were skipped due to truncated attacker lists from zKillboard. Now forces ESI fetch when `attackerCount` doesn't match the local list.
-- Improved ESI caching robustness by removing `return_response=True`, allowing `django-esi` to handle 304s more reliably.
-- Added more detailed logging for ESI calls and killmail filtering.
-
-## [0.1.10] - 2026-01-27
-
-### Changed
-
-- Internal version bump for deployment.
-
-## [0.1.9] - 2026-01-27
-
-### Fixed
-
-- Handled ESI 304 Not Modified responses gracefully in OpenAPI client.
-
-## [0.1.8] - 2026-01-27
-
-### Fixed
-
-- Fixed ESI client tag typo (`Killmail` -> `Killmails`).
-- Improved logging for killmail processing and ESI fetching.
-
-## [0.1.7] - 2026-01-27
-
-### Fixed
-
-- Improved logging for ZKillboard data pull task to aid debugging.
+- Release Candidate
 
 ## [0.1.6] - 2026-01-27
 
