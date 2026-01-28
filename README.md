@@ -12,6 +12,10 @@
 # AA Campaign
 AA Campaign is a plugin for **Alliance Auth** that allows you to create and track Z-Kill campaigns. Whether you're monitoring a specific system, a whole region, or targeting a rival alliance, AA Campaign pulls data directly from ZKillboard to provide real-time intelligence and performance tracking.
 
+## Screenshots
+<img src="https://i.imgur.com/UZWiWMh.png" alt="AA Campaign dashboard overview" width="900" style="max-width: 100%; height: auto;">
+<img src="https://i.imgur.com/sY9H53O.png" alt="AA Campaign killmails view" width="900" style="max-width: 100%; height: auto;">
+
 ## Index
 
 - [AA Campaign](#aa-campaign)
