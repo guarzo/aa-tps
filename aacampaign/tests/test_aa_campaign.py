@@ -443,3 +443,103 @@ class TestGlobalCampaign(TestCase):
             mock_call.assert_not_called()
             self.assertIn('killmail_time', km_data)
             self.assertEqual(km_data['solar_system_id'], system.id)
+
+    @patch('aacampaign.tasks.call_result')
+    def test_should_include_killmail_triggers_esi(self, mock_call_result):
+        # Killmail missing fields, not in DB
+        km_data = {
+            'killmail_id': 1234567,
+            'zkb': {'hash': 'abc123hash'}
+            # missing attackers, victim, etc.
+        }
+
+        # Mock ESI response
+        mock_esi_data = {
+            'killmail_id': 1234567,
+            'killmail_time': timezone.now().isoformat(),
+            'solar_system_id': 30000001,
+            'victim': {
+                'character_id': 1,
+                'corporation_id': 10,
+                'ship_type_id': 601
+            },
+            'attackers': [
+                {
+                    'character_id': 111, # Friendly
+                    'corporation_id': 10,
+                    'final_blow': True
+                }
+            ]
+        }
+        mock_call_result.return_value = (mock_esi_data, None)
+
+        # Basic setup
+        region = EveRegion.objects.create(id=10000003, name="ESI Region")
+        constellation = EveConstellation.objects.create(id=20000003, name="ESI Const", eve_region=region)
+        system = EveSolarSystem.objects.create(id=30000001, name="ESI System", eve_constellation=constellation, security_status=0.5)
+        char1 = EveCharacter.objects.create(character_id=111, character_name="ESI Friendly", corporation_id=10)
+
+        campaign = Campaign.objects.create(
+            name="ESI Test Campaign",
+            start_date=timezone.now() - timezone.timedelta(days=1),
+            is_active=True
+        )
+        CampaignMember.objects.create(campaign=campaign, character=char1)
+
+        # This should call ESI and succeed
+        self.assertTrue(should_include_killmail(campaign, km_data))
+
+        # Verify call_result was called with the correct operation (plural Killmails)
+        self.assertEqual(mock_call_result.call_count, 1)
+        args, _ = mock_call_result.call_args
+        # The first arg is the operation. We can't easily check its name if it's a mock or a dynamic object,
+        # but if we didn't get an AttributeError, it means the path esi.client.Killmails... was valid.
+
+    @patch('aacampaign.tasks.call_result')
+    def test_should_include_killmail_truncated_attackers(self, mock_call_result):
+        # Setup: Campaign for Alliance 99009902
+        campaign = Campaign.objects.create(
+            name="Truncated Test Campaign",
+            start_date=timezone.now() - timezone.timedelta(days=1),
+            is_active=True
+        )
+        alliance = EveAllianceInfo.objects.create(alliance_id=99009902, alliance_name="Test Alliance", executor_corp_id=1)
+        CampaignMember.objects.create(campaign=campaign, alliance=alliance)
+
+        # ZKB returns a killmail with attackerCount=5, but 'attackers' list has only 1 guy (not friendly)
+        km_data = {
+            'killmail_id': 333333,
+            'killmail_time': timezone.now().isoformat(),
+            'solar_system_id': 30000001,
+            'zkb': {
+                'hash': 'hash333',
+                'attackerCount': 5
+            },
+            'attackers': [
+                {
+                    'character_id': 999, # Random guy
+                    'final_blow': True
+                }
+            ],
+            'victim': {'character_id': 888}
+        }
+
+        # Mock ESI response with the full list including our friendly
+        mock_esi_data = km_data.copy()
+        mock_esi_data['attackers'] = [
+            {'character_id': 999, 'final_blow': True},
+            {'character_id': 111, 'alliance_id': 99009902, 'final_blow': False}, # Our friendly!
+            {'character_id': 112},
+            {'character_id': 113},
+            {'character_id': 114},
+        ]
+        mock_call_result.return_value = (mock_esi_data, None)
+
+        # Initially, km_data has no friendly in attackers.
+        # But it HAS final_blow=True guy, so old logic would have skipped ESI!
+
+        # This should call ESI because len(attackers) < attackerCount
+        self.assertTrue(should_include_killmail(campaign, km_data))
+        self.assertEqual(mock_call_result.call_count, 1)
+        self.assertIn('attackers', km_data)
+        self.assertEqual(len(km_data['attackers']), 5)

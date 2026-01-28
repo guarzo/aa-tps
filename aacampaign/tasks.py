@@ -55,6 +55,17 @@ def _zkill_get(url):
     return response
 
 
+def _fetch_universe_names(ids):
+    try:
+        data, _ = call_result(
+            lambda: esi.client.Universe.PostUniverseNames,
+            body=ids
+        )
+        return data
+    except Exception:
+        return None
+
+
 def get_killmail_data_from_db(killmail_id):
     """
     Try to find killmail data in our database from previous campaign matches.
@@ -138,10 +149,13 @@ def _pull_zkillboard_data_logic(lock_id, past_seconds=None):
         if campaign_lookback < campaign.start_date:
             campaign_lookback = campaign.start_date
 
+        friendly_ids = campaign_meta[campaign.id]['friendly_ids']
+        target_ids = campaign_meta[campaign.id]['target_ids']
+        has_friendlies = any(friendly_ids.values())
         has_filters = (
-            campaign_meta[campaign.id]['target_ids']['characters'] or
-            campaign_meta[campaign.id]['target_ids']['corporations'] or
-            campaign_meta[campaign.id]['target_ids']['alliances'] or
+            target_ids['characters'] or
+            target_ids['corporations'] or
+            target_ids['alliances'] or
             campaign_meta[campaign.id]['system_ids'] or
             campaign_meta[campaign.id]['constellation_ids'] or
             campaign_meta[campaign.id]['region_ids']
@@ -151,10 +165,16 @@ def _pull_zkillboard_data_logic(lock_id, past_seconds=None):
             if (etype, eid) not in raw_entities or campaign_lookback < raw_entities[(etype, eid)]:
                 raw_entities[(etype, eid)] = campaign_lookback
 
-        if has_filters:
-            # Smart Pull: Only pull targets and locations.
-            # Friendlies in these locations/against these targets will be caught.
-            # Friendlies outside these locations/against non-targets are ignored by should_include_killmail.
+        if has_friendlies:
+            # Friendly-first pull: reduces zKillboard volume and ESI calls.
+            for char_id in friendly_ids['characters']:
+                add_raw_entity('characterID', char_id)
+            for corp_id in friendly_ids['corporations']:
+                add_raw_entity('corporationID', corp_id)
+            for alliance_id in friendly_ids['alliances']:
+                add_raw_entity('allianceID', alliance_id)
+        elif has_filters:
+            # No friendlies configured; fall back to targets and locations.
             for target in campaign.targets.all():
                 if target.character: add_raw_entity('characterID', target.character.character_id)
                 if target.corporation: add_raw_entity('corporationID', target.corporation.corporation_id)
@@ -163,12 +183,6 @@ def _pull_zkillboard_data_logic(lock_id, past_seconds=None):
             for system in campaign.systems.all(): add_raw_entity('systemID', system.id)
             for constellation in campaign.constellations.all(): add_raw_entity('constellationID', constellation.id)
             for region in campaign.regions.all(): add_raw_entity('regionID', region.id)
-        else:
-            # Global Pull: No filters, so we must pull for all friendlies to track their global activity.
-            for member in campaign.members.all():
-                if member.character: add_raw_entity('characterID', member.character.character_id)
-                if member.corporation: add_raw_entity('corporationID', member.corporation.corporation_id)
-                if member.alliance: add_raw_entity('allianceID', member.alliance.alliance_id)
 
     if not raw_entities:
         Campaign.objects.filter(id__in=[c.id for c in active_campaigns]).update(last_run=now)
@@ -388,7 +402,7 @@ def _pull_zkillboard_data_logic(lock_id, past_seconds=None):
 @shared_task(time_limit=7200)
 def repair_campaign_killmails():
     """
-    Find killmails with missing ship information and attempt to repair them
+    Find killmails with missing information and attempt to repair them
     by fetching full data from zKillboard and ESI.
     """
     lock_id = "aacampaign-repair-campaign-killmails-lock"
@@ -401,9 +415,13 @@ def repair_campaign_killmails():
         # Get unique killmail IDs that need repair
         kms_to_repair = list(CampaignKillmail.objects.filter(
             Q(ship_type_id=0) |
+            Q(ship_type_name="Unknown", ship_type_id__gt=0) |
             Q(ship_group_name="Unknown") |
+            Q(victim_name="Unknown", victim_id__gt=0) |
+            Q(victim_corp_name="Unknown", victim_corp_id__gt=0) |
             Q(final_blow_char_id=0, final_blow_corp_id=0) |
             Q(final_blow_char_name="", final_blow_char_id__gt=0) |
+            Q(final_blow_char_name="Unknown", final_blow_char_id__gt=0) |
             Q(final_blow_corp_name="Unknown", final_blow_corp_id__gt=0)
         ).values_list('killmail_id', flat=True).distinct())
 
@@ -500,6 +518,7 @@ def fetch_from_zkill(entity_type, entity_id, past_seconds=None, page=None, year=
                 f"expected list, got {type(data)}. Content: {data}"
             )
             return None
+        logger.debug(f"Fetched {len(data)} results from zKillboard for {entity_type} {entity_id}")
         return data
     except Exception as e:
         logger.error(f"Error fetching from zkillboard for {entity_type} {entity_id}: {e}")
@@ -509,7 +528,7 @@ def fetch_killmail_from_esi(killmail_id, killmail_hash):
     try:
         logger.debug(f"Fetching killmail {killmail_id} from ESI")
         data, _ = call_result(
-            esi.client.Killmail.GetKillmailsKillmailIdKillmailHash,
+            lambda: esi.client.Killmails.GetKillmailsKillmailIdKillmailHash,
             killmail_id=killmail_id,
             killmail_hash=killmail_hash
         )
@@ -559,15 +578,22 @@ def should_include_killmail(campaign, km_data, campaign_meta=None, context=None)
 
     # Check if we have enough data to evaluate involvement and process it correctly
     # We need: time, system, victim (for ship info), and attackers (for involvement and final blow)
-    has_full_attackers = 'attackers' in km_data and any('final_blow' in a for a in km_data['attackers'])
-    needs_esi = any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers']) or not has_full_attackers
+    attacker_count = km_data.get('zkb', {}).get('attackerCount', 0)
+    has_all_attackers = 'attackers' in km_data and len(km_data['attackers']) >= attacker_count
+    has_final_blow = 'attackers' in km_data and any('final_blow' in a for a in km_data['attackers'])
+
+    needs_esi = (
+        any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers']) or
+        not has_final_blow or
+        not has_all_attackers
+    )
 
     if needs_esi:
         km_id_val = km_data.get('killmail_id')
         km_hash = km_data.get('zkb', {}).get('hash')
 
         # Check local DB cache for time/system/victim if that's all we were missing
-        # But if we are missing attackers with final blow info, we usually need ESI
+        # But if we are missing attackers with final blow info or full list, we usually need ESI
         if ('killmail_time' not in km_data or 'solar_system_id' not in km_data):
             if km_id_val:
                 db_time, db_system_id = get_killmail_data_from_db(km_id_val)
@@ -575,17 +601,26 @@ def should_include_killmail(campaign, km_data, campaign_meta=None, context=None)
                     km_data['killmail_time'] = db_time.isoformat()
                     km_data['solar_system_id'] = db_system_id
                     # Re-check if we still need ESI
-                    has_full_attackers = 'attackers' in km_data and any('final_blow' in a for a in km_data['attackers'])
-                    needs_esi = any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers']) or not has_full_attackers
+                    has_all_attackers = 'attackers' in km_data and len(km_data['attackers']) >= attacker_count
+                    has_final_blow = 'attackers' in km_data and any('final_blow' in a for a in km_data['attackers'])
+                    needs_esi = (
+                        any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers']) or
+                        not has_final_blow or
+                        not has_all_attackers
+                    )
 
         if needs_esi:
             if km_hash:
-                logger.info(f"Killmail {km_id} missing full data (ESI fetch needed={needs_esi}, has_full_attackers={has_full_attackers}), attempting to fetch from ESI")
+                reason = "missing fields"
+                if not has_final_blow: reason = "missing final blow"
+                if not has_all_attackers: reason = f"incomplete attackers ({len(km_data.get('attackers', []))}/{attacker_count})"
+                logger.info(f"Killmail {km_id} needs ESI fetch ({reason}), attempting to fetch")
                 esi_data = fetch_killmail_from_esi(km_id_val, km_hash)
                 if esi_data:
+                    logger.debug(f"Successfully fetched killmail {km_id} from ESI")
                     km_data.update(esi_data)
                 else:
-                    logger.warning(f"Killmail {km_id} missing required fields and ESI fetch failed")
+                    logger.warning(f"Killmail {km_id} missing required fields and ESI fetch failed (ID: {km_id_val}, Hash: {km_hash})")
                     return False
             else:
                 logger.warning(f"Killmail {km_id} missing required fields and no hash available for ESI fetch")
@@ -616,7 +651,7 @@ def should_include_killmail(campaign, km_data, campaign_meta=None, context=None)
     friendly_involved = is_entity_involved(km_data, friendly_ids)
 
     if not friendly_involved:
-        logger.debug(f"Killmail {km_id} skipped for campaign {campaign}: no friendly involvement")
+        logger.debug(f"Killmail {km_id} skipped for campaign {campaign}: no friendly involvement. Attackers: {len(km_data.get('attackers', []))}")
         return False
 
     # Target check
@@ -751,18 +786,22 @@ def process_killmail(campaign, km_data, campaign_meta=None, context=None):
         logger.error(f"Failed to parse killmail_time for killmail {km_id}")
         return
 
-    def get_name(eid):
-        if not eid: return ""
+    def get_name(eid, name_hint=None):
+        def cache_name(name):
+            if context and eid:
+                context.setdefault('resolved_names', {})[eid] = name
+            return name
+
+        if name_hint and name_hint != "Unknown":
+            return cache_name(name_hint)
+        if not eid:
+            return ""
         if context and eid in context.get('resolved_names', {}):
             return context['resolved_names'][eid]
-        try:
-            data, _ = call_result(esi.client.Universe.PostUniverseNames, ids=[eid])
-            if data:
-                name = data[0]['name']
-                if context: context.setdefault('resolved_names', {})[eid] = name
-                return name
-        except Exception as e:
-            logger.warning(f"Failed to resolve name for {eid}: {e}")
+
+        data = _fetch_universe_names([eid])
+        if data:
+            return cache_name(data[0].get('name', "Unknown"))
         return "Unknown"
 
     # Is it a loss for our side?
@@ -779,15 +818,15 @@ def process_killmail(campaign, km_data, campaign_meta=None, context=None):
         is_loss = True
 
     # Resolve names
-    victim_id = victim.get('character_id', 0)
-    victim_corp_id = victim.get('corporation_id', 0)
+    victim_id = victim.get('character_id') or 0
+    victim_corp_id = victim.get('corporation_id') or 0
     victim_alliance_id = victim.get('alliance_id')
 
     ship_type_id = victim.get('ship_type_id', 0)
     ship_type_name = "Unknown"
     ship_group_name = "Unknown"
     if ship_type_id:
-        ship_type_name = get_name(ship_type_id)
+        ship_type_name = get_name(ship_type_id, victim.get('ship_type_name'))
         try:
             # Also get ship group name for stats
             s_type = None
@@ -797,14 +836,29 @@ def process_killmail(campaign, km_data, campaign_meta=None, context=None):
                 s_type, _ = EveType.objects.get_or_create_esi(id=ship_type_id)
                 if context: context.setdefault('resolved_types', {})[ship_type_id] = s_type
 
-            if s_type and s_type.eve_group:
-                ship_group_name = s_type.eve_group.name
+            if s_type:
+                if ship_type_name in ("", "Unknown"):
+                    ship_type_name = getattr(s_type, "name", ship_type_name)
+                if s_type.eve_group:
+                    ship_group_name = s_type.eve_group.name
         except Exception as e:
             logger.warning(f"Failed to get ship group for {ship_type_id}: {e}")
 
-    victim_name = get_name(victim_id) if victim_id else "Unknown"
-    victim_corp_name = get_name(victim_corp_id) if victim_corp_id else "Unknown"
-    victim_alliance_name = get_name(victim_alliance_id) if victim_alliance_id else ""
+    victim_name = (
+        get_name(victim_id, victim.get('character_name'))
+        if (victim_id or victim.get('character_name'))
+        else "Unknown"
+    )
+    victim_corp_name = (
+        get_name(victim_corp_id, victim.get('corporation_name'))
+        if (victim_corp_id or victim.get('corporation_name'))
+        else "Unknown"
+    )
+    victim_alliance_name = (
+        get_name(victim_alliance_id, victim.get('alliance_name'))
+        if (victim_alliance_id or victim.get('alliance_name'))
+        else ""
+    )
 
     # Resolve Final Blow attacker
     final_blow_attacker = next((a for a in km_data.get('attackers', []) if a.get('final_blow')), {})
@@ -815,9 +869,21 @@ def process_killmail(campaign, km_data, campaign_meta=None, context=None):
     fb_corp_id = final_blow_attacker.get('corporation_id', 0)
     fb_alliance_id = final_blow_attacker.get('alliance_id')
 
-    fb_char_name = get_name(fb_char_id) if fb_char_id else ""
-    fb_corp_name = get_name(fb_corp_id) if fb_corp_id else "Unknown"
-    fb_alliance_name = get_name(fb_alliance_id) if fb_alliance_id else ""
+    fb_char_name = (
+        get_name(fb_char_id, final_blow_attacker.get('character_name'))
+        if (fb_char_id or final_blow_attacker.get('character_name'))
+        else ""
+    )
+    fb_corp_name = (
+        get_name(fb_corp_id, final_blow_attacker.get('corporation_name'))
+        if (fb_corp_id or final_blow_attacker.get('corporation_name'))
+        else "Unknown"
+    )
+    fb_alliance_name = (
+        get_name(fb_alliance_id, final_blow_attacker.get('alliance_name'))
+        if (fb_alliance_id or final_blow_attacker.get('alliance_name'))
+        else ""
+    )
 
     # Get system
     system_id = km_data['solar_system_id']

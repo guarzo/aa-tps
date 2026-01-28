@@ -56,7 +56,16 @@ sudo supervisorctl restart myauth:
 
 > [!TIP]
 > You can manually trigger a data pull using:
-> `python manage.py aa_campaign_pull --days 30`
+> ```bash
+> python manage.py aa_campaign_pull --days 30
+> ````
+>
+> adding `--verbose` to the end will display the raw data pulled from ZKillboard.
+>
+> You can repair killmails using:
+> ```bash
+> python manage.py aa_campaign_repair
+> ```
 
 > [!WARNING]
 > Running a long pull, or setting a campaign set far into the past can take an extremely long time.
