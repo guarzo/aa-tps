@@ -245,9 +245,9 @@ def _log_rate_limit_remaining(headers: dict | None) -> None:
     group = headers.get("x-ratelimit-group") or headers.get("X-RateLimit-Group") or "unknown"
     limit = headers.get("x-ratelimit-limit") or headers.get("X-RateLimit-Limit") or ""
     if limit:
-        logger.info("ESI rate limit remaining: %s %s/%s", group, remaining, limit)
+        logger.debug("ESI rate limit remaining: %s %s/%s", group, remaining, limit)
     else:
-        logger.info("ESI rate limit remaining: %s %s", group, remaining)
+        logger.debug("ESI rate limit remaining: %s %s", group, remaining)
 
 
 def _parse_window_seconds(limit_header: str | None) -> int | None:

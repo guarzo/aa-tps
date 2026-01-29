@@ -47,7 +47,7 @@ def _configure_logging(verbose):
     if not aatps_logger.handlers:
         handler = logging.StreamHandler()
         handler.setLevel(logging.DEBUG if verbose else logging.INFO)
-        formatter = logging.Formatter('[%(levelname)s] %(message)s')
+        formatter = logging.Formatter("[%(levelname)s] %(message)s")
         handler.setFormatter(formatter)
         aatps_logger.addHandler(handler)
         aatps_logger.propagate = False  # Don't double-log to root
@@ -82,7 +82,9 @@ class Command(BaseCommand):
         lock_id = "aatps-pull-monthly-killmails-lock"
 
         if clear_lock or force:
+            # Django
             from django.core.cache import cache
+
             if cache.get(lock_id):
                 cache.delete(lock_id)
                 self.stdout.write(self.style.SUCCESS("Cleared existing task lock."))

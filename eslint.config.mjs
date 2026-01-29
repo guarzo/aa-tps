@@ -1,4 +1,41 @@
-import globals from "globals";
+// Define browser globals inline to avoid package resolution issues in CI
+const browserGlobals = {
+    window: "readonly",
+    document: "readonly",
+    console: "readonly",
+    setTimeout: "readonly",
+    setInterval: "readonly",
+    clearTimeout: "readonly",
+    clearInterval: "readonly",
+    fetch: "readonly",
+    URL: "readonly",
+    URLSearchParams: "readonly",
+    FormData: "readonly",
+    Event: "readonly",
+    CustomEvent: "readonly",
+    Element: "readonly",
+    HTMLElement: "readonly",
+    Node: "readonly",
+    NodeList: "readonly",
+    navigator: "readonly",
+    location: "readonly",
+    history: "readonly",
+    localStorage: "readonly",
+    sessionStorage: "readonly",
+    requestAnimationFrame: "readonly",
+    cancelAnimationFrame: "readonly",
+    MutationObserver: "readonly",
+    ResizeObserver: "readonly",
+    IntersectionObserver: "readonly",
+    Blob: "readonly",
+    File: "readonly",
+    FileReader: "readonly",
+    atob: "readonly",
+    btoa: "readonly",
+    alert: "readonly",
+    confirm: "readonly",
+    prompt: "readonly",
+};
 
 export default [
     {
@@ -7,8 +44,7 @@ export default [
             ecmaVersion: 2022,
             sourceType: "script",
             globals: {
-                ...globals.browser,
-                ...globals.jquery,
+                ...browserGlobals,
                 Chart: "readonly",
                 $: "readonly",
                 jQuery: "readonly",

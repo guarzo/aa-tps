@@ -5,7 +5,7 @@ from calendar import monthrange
 from datetime import datetime
 from datetime import timezone as dt_timezone
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any
 
 
 def get_current_month_range() -> tuple[datetime, datetime]:
@@ -46,7 +46,7 @@ def get_month_range(year: int, month: int) -> tuple[datetime, datetime]:
     return start, end
 
 
-def format_isk(value: Union[Decimal, float, int] | None) -> str:
+def format_isk(value: Decimal | float | int | None) -> str:
     """
     Format ISK value for display with appropriate suffix.
 

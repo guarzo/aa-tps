@@ -10,7 +10,7 @@
 
 .stats-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 20px rgb(0 0 0 / 20%);
 }
 
 .stats-card .card-body {
@@ -76,12 +76,12 @@
 .kill-card {
     border-left: 4px solid #28a745;
     transition: all 0.2s ease;
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: rgb(255 255 255 / 2%);
     border-radius: 0 4px 4px 0;
 }
 
 .kill-card:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgb(255 255 255 / 5%);
     transform: translateX(2px);
 }
 
@@ -111,16 +111,16 @@
 }
 
 .top-kills-list::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgb(255 255 255 / 5%);
 }
 
 .top-kills-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgb(255 255 255 / 20%);
     border-radius: 3px;
 }
 
 .top-kills-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgb(255 255 255 / 30%);
 }
 
 /* Leaderboard rank badges */
@@ -139,22 +139,22 @@
 
 .rank-badge.rank-1 {
     background: linear-gradient(135deg, #FFD700, #FFA500);
-    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+    box-shadow: 0 2px 8px rgb(255 215 0 / 40%);
 }
 
 .rank-badge.rank-2 {
     background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
-    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+    box-shadow: 0 2px 8px rgb(192 192 192 / 40%);
 }
 
 .rank-badge.rank-3 {
     background: linear-gradient(135deg, #CD7F32, #8B4513);
-    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+    box-shadow: 0 2px 8px rgb(205 127 50 / 40%);
 }
 
 .rank-badge.rank-other {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
+    background: rgb(255 255 255 / 10%);
+    color: rgb(255 255 255 / 70%);
 }
 
 /* Month selector */
@@ -187,12 +187,12 @@
 
 .recent-kills-list .killmail-row {
     padding: 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgb(255 255 255 / 10%);
     transition: background-color 0.2s;
 }
 
 .recent-kills-list .killmail-row:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: rgb(255 255 255 / 3%);
 }
 
 .recent-kills-list .killmail-row:last-child {
@@ -210,13 +210,13 @@
 /* My Activity tab personal stats */
 .personal-stat {
     padding: 1.5rem 1rem;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgb(255 255 255 / 2%);
     border-radius: 8px;
     transition: background-color 0.2s;
 }
 
 .personal-stat:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgb(255 255 255 / 5%);
 }
 
 .personal-stat h3 {
@@ -237,7 +237,7 @@
     content: "";
     width: 2rem;
     height: 2rem;
-    border: 3px solid rgba(255, 255, 255, 0.1);
+    border: 3px solid rgb(255 255 255 / 10%);
     border-top-color: #007bff;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -280,13 +280,13 @@
 
 .card-header .nav-tabs .nav-link {
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgb(255 255 255 / 60%);
     background: transparent;
     padding: 0.5rem 1rem;
 }
 
 .card-header .nav-tabs .nav-link:hover {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgb(255 255 255 / 90%);
     border: none;
 }
 
@@ -301,7 +301,7 @@
 .empty-state {
     text-align: center;
     padding: 3rem 1rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgb(255 255 255 / 50%);
 }
 
 .empty-state i {
@@ -316,7 +316,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 991.98px) {
+@media (width <= 991.98px) {
     .stats-card .card-title {
         font-size: 1.5rem;
     }
@@ -334,7 +334,7 @@
     }
 }
 
-@media (max-width: 767.98px) {
+@media (width <= 767.98px) {
     .stats-card {
         margin-bottom: 1rem;
     }
@@ -362,7 +362,7 @@
 /* Efficiency bar */
 .efficiency-bar {
     height: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgb(255 255 255 / 10%);
     border-radius: 3px;
     overflow: hidden;
     margin-top: 0.5rem;

@@ -233,36 +233,13 @@ def _pull_monthly_killmails_logic():
 
     logger.info(f"Pulling killmails for {month_start.strftime('%B %Y')}")
 
-    # Get all auth characters and group them
-    characters = get_all_auth_characters()
+    # Get all auth character IDs - we pull individually per character
+    # This is more efficient than alliance/corp pulls because we only
+    # fetch killmails for characters that are actually authenticated
+    characters = list(get_all_auth_characters())
+    character_ids = [char.character_id for char in characters]
 
-    # Build sets for deduplication
-    alliances_to_pull = set()
-    corps_to_pull = set()
-    solo_characters = []
-
-    # Track which corps belong to which alliances (for dedup)
-    alliance_corp_map = {}  # alliance_id -> set of corp_ids
-
-    for char in characters:
-        if char.alliance_id:
-            alliances_to_pull.add(char.alliance_id)
-            alliance_corp_map.setdefault(char.alliance_id, set()).add(char.corporation_id)
-        elif char.corporation_id:
-            corps_to_pull.add(char.corporation_id)
-        else:
-            solo_characters.append(char.character_id)
-
-    # Remove corps that are covered by alliance pulls
-    corps_in_alliances = set()
-    for corp_set in alliance_corp_map.values():
-        corps_in_alliances.update(corp_set)
-    corps_to_pull = corps_to_pull - corps_in_alliances
-
-    logger.info(
-        f"Entities to pull: {len(alliances_to_pull)} alliances, "
-        f"{len(corps_to_pull)} corps, {len(solo_characters)} solo chars"
-    )
+    logger.info(f"Found {len(character_ids)} authenticated characters to pull")
 
     # Get all auth character IDs for participant matching
     auth_char_ids = get_auth_character_ids()
@@ -308,47 +285,18 @@ def _pull_monthly_killmails_logic():
         total_participants += new_participants
         return new_kms
 
-    # Pull alliances
-    if alliances_to_pull:
-        logger.info(f"Pulling {len(alliances_to_pull)} alliances...")
-    for i, alliance_id in enumerate(alliances_to_pull, 1):
+    # Pull killmails for each authenticated character
+    for i, char_id in enumerate(character_ids, 1):
         if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
             break
 
-        logger.info(f"[Alliance {i}/{len(alliances_to_pull)}] Pulling alliance {alliance_id}")
-        _pull_entity_killmails("allianceID", alliance_id, year, month, month_start, process_page)
+        # Log progress every 10 characters or for first/last
+        if i == 1 or i % 10 == 0 or i == len(character_ids):
+            logger.info(
+                f"[Character {i}/{len(character_ids)}] Progress: {total_killmails} killmails, {total_participants} participants"
+            )
 
-    if alliances_to_pull:
-        logger.info(
-            f"Alliance pulls complete. Running total: {total_killmails} killmails, {total_participants} participants"
-        )
-
-    # Pull corps not covered by alliances
-    if corps_to_pull:
-        logger.info(f"Pulling {len(corps_to_pull)} corporations...")
-    for i, corp_id in enumerate(corps_to_pull, 1):
-        if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
-            logger.warning("Task exceeded 2 hour limit, stopping early.")
-            break
-
-        logger.info(f"[Corp {i}/{len(corps_to_pull)}] Pulling corporation {corp_id}")
-        _pull_entity_killmails("corporationID", corp_id, year, month, month_start, process_page)
-
-    if corps_to_pull:
-        logger.info(
-            f"Corporation pulls complete. Running total: {total_killmails} killmails, {total_participants} participants"
-        )
-
-    # Pull solo characters
-    if solo_characters:
-        logger.info(f"Pulling {len(solo_characters)} solo characters...")
-    for i, char_id in enumerate(solo_characters, 1):
-        if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
-            logger.warning("Task exceeded 2 hour limit, stopping early.")
-            break
-
-        logger.info(f"[Char {i}/{len(solo_characters)}] Pulling character {char_id}")
         _pull_entity_killmails("characterID", char_id, year, month, month_start, process_page)
 
     elapsed = time.time() - start_time
