@@ -7,43 +7,31 @@ on:
 
 jobs:
   release:
-    # Release
     name: Release
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for PyPI OIDC trusted publishing
+      contents: write  # Required for uploading release assets
 
     steps:
-      # Checkout the repository
       - name: Checkout
         uses: actions/checkout@v6
 
-      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version-file: 'pyproject.toml' # Read the Python version from the pyproject.toml file
+          python-version-file: 'pyproject.toml'
 
-      # Install Tools
-      - name: Install Tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --upgrade build
-          python -m pip install --upgrade setuptools wheel twine
+      - name: Install build tools
+        run: python -m pip install --upgrade pip build
 
-      # Package and Upload to PyPI
-      - name: Package and Upload to PyPI
-        env:
-          STACKMANAGER_VERSION: ${{ github.event.release.tag_name }}
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_APIKEY }}
-        run: |
-          python -m build
-          python -m twine upload dist/*
+      - name: Build package
+        run: python -m build
 
-      # Add Assets to Release on GitHub
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
       - name: Add Assets to Release on GitHub
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # The name of the file(s) to upload
-          files: |
-            dist/*
+          files: dist/*
