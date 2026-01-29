@@ -49,35 +49,35 @@ AA-TPS automatically tracks and visualizes PvP activity for all authenticated us
 ## Installation
 
 1. **Activate your virtual environment:**
-   ```bash
-   source /home/allianceserver/venv/auth/bin/activate
-   cd /home/allianceserver/myauth/
-   ```
+  ```bash
+  source /home/allianceserver/venv/auth/bin/activate
+  cd /home/allianceserver/myauth/
+  ```
 
 2. **Install the package:**
-   ```bash
-   pip install aa-tps
-   ```
+  ```bash
+  pip install aa-tps
+  ```
 
 3. **Add to INSTALLED_APPS** in your `local.py`:
-   ```python
-   INSTALLED_APPS += [
-       'eveuniverse',  # if not already added
-       'aatps',
-   ]
-   ```
+  ```python
+  INSTALLED_APPS += [
+      'eveuniverse',  # if not already added
+      'aatps',
+  ]
+  ```
 
 4. **Run migrations and setup:**
-   ```bash
-   python manage.py migrate
-   python manage.py collectstatic --noinput
-   python manage.py aa_tps_setup
-   ```
+  ```bash
+  python manage.py migrate
+  python manage.py collectstatic --noinput
+  python manage.py aa_tps_setup
+  ```
 
 5. **Restart services:**
-   ```bash
-   sudo supervisorctl restart myauth:
-   ```
+  ```bash
+  sudo supervisorctl restart myauth:
+  ```
 
 ## Configuration
 
@@ -117,11 +117,11 @@ python manage.py aa_tps_pull --verbose
 1. Grant users the `aatps.basic_access` permission
 2. Users can access the dashboard from the sidebar menu
 3. The dashboard shows:
-   - Organization-wide statistics for the current month
-   - Interactive charts and graphs
-   - Leaderboard of top performers
-   - Personal statistics (if enabled)
-   - Recent activity feed
+  - Organization-wide statistics for the current month
+  - Interactive charts and graphs
+  - Leaderboard of top performers
+  - Personal statistics (if enabled)
+  - Recent activity feed
 
 ## Permissions
 
@@ -133,16 +133,16 @@ python manage.py aa_tps_pull --verbose
 
 ```
 ZKillboard API
-     |
+  |
 [Hourly Celery Task]
-     |
-   ESI API (for full killmail details)
-     |
+  |
+ESI API (for full killmail details)
+  |
 [MonthlyKillmail + KillmailParticipant models]
-     |
-   Dashboard Views
-     |
-  Chart.js Visualizations
+  |
+Dashboard Views
+  |
+Chart.js Visualizations
 ```
 
 ## API Politeness

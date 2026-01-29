@@ -327,9 +327,9 @@
                         <div class="kill-card p-3 mb-2 d-flex align-items-center">
                             <div class="ship-render me-3">
                                 <img src="https://images.evetech.net/types/${kill.ship_type_id}/render?size=64"
-                                     alt="${kill.ship_type_name}"
-                                     class="rounded"
-                                     loading="lazy">
+                                    alt="${kill.ship_type_name}"
+                                    class="rounded"
+                                    loading="lazy">
                             </div>
                             <div class="flex-grow-1 min-width-0">
                                 <div class="d-flex justify-content-between align-items-start">
@@ -341,9 +341,9 @@
                                 </small>
                             </div>
                             <a href="https://zkillboard.com/kill/${kill.killmail_id}/"
-                               target="_blank"
-                               class="btn btn-sm btn-outline-secondary ms-2 zkill-link"
-                               title="View on zKillboard">
+                                target="_blank"
+                                class="btn btn-sm btn-outline-secondary ms-2 zkill-link"
+                                title="View on zKillboard">
                                 <i class="fas fa-external-link-alt"></i>
                             </a>
                         </div>`;
@@ -398,9 +398,9 @@
                             <div class="character-cell">
                                 ${rankBadge}
                                 <img src="https://images.evetech.net/characters/${row.portrait_id}/portrait?size=64"
-                                     class="character-portrait"
-                                     alt="${data}"
-                                     loading="lazy">
+                                    class="character-portrait"
+                                    alt="${data}"
+                                    loading="lazy">
                                 <span>${data}</span>
                             </div>`;
                     }
@@ -473,14 +473,14 @@
                         <div class="killmail-row ${isLoss ? 'is-loss' : 'is-kill'}">
                             <div class="d-flex align-items-center">
                                 <img src="https://images.evetech.net/types/${kill.ship_type_id}/render?size=32"
-                                     class="me-3 rounded"
-                                     alt="${kill.ship_type_name}"
-                                     loading="lazy">
+                                    class="me-3 rounded"
+                                    alt="${kill.ship_type_name}"
+                                    loading="lazy">
                                 <div class="flex-grow-1 min-width-0">
                                     <div class="d-flex justify-content-between">
                                         <a href="https://zkillboard.com/kill/${kill.killmail_id}/"
-                                           target="_blank"
-                                           class="text-info text-decoration-none fw-bold text-truncate">
+                                            target="_blank"
+                                            class="text-info text-decoration-none fw-bold text-truncate">
                                             ${kill.ship_type_name}
                                         </a>
                                         <span class="${isLoss ? 'text-danger' : 'text-success'} ms-2">
@@ -581,13 +581,13 @@
                         <div class="killmail-row ${isLoss ? 'is-loss' : 'is-kill'}">
                             <div class="d-flex align-items-center">
                                 <img src="https://images.evetech.net/types/${kill.ship_type_id}/render?size=32"
-                                     class="me-2 rounded"
-                                     alt="${kill.ship_type_name}"
-                                     loading="lazy">
+                                    class="me-2 rounded"
+                                    alt="${kill.ship_type_name}"
+                                    loading="lazy">
                                 <div class="flex-grow-1">
                                     <a href="https://zkillboard.com/kill/${kill.killmail_id}/"
-                                       target="_blank"
-                                       class="text-info text-decoration-none">
+                                        target="_blank"
+                                        class="text-info text-decoration-none">
                                         ${kill.ship_type_name}
                                     </a>
                                     <span class="${isLoss ? 'text-danger' : 'text-success'} ms-2">

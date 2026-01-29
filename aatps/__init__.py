@@ -1,7 +1,7 @@
 """Initialize the app"""
 from django.utils.translation import gettext_lazy as _
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 __title__ = "TPS"
 __title_translated__ = _("AA TPS")
 
@@ -12,4 +12,4 @@ __app_name__ = "aa-tps"
 __app_name_verbose__ = "Alliance Auth Total Participation Statistics"
 __app_name_useragent__ = "AA-TPS"
 
-__github_url__ = f"https://github.com/BroodLK/aa-tps"
+__github_url__ = "https://github.com/BroodLK/aa-tps"
