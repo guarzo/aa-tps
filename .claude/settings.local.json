@@ -7,7 +7,10 @@
       "Bash(python -m py_compile:*)",
       "Bash(python:*)",
       "WebSearch",
-      "WebFetch(domain:gitlab.com)"
+      "WebFetch(domain:gitlab.com)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(pip show:*)"
     ]
   }
 }

@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
+# Standard Library
 import logging
 import time
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from hashlib import md5
+from typing import Any, Optional, Tuple
 
+# Django
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
+
+# Third-party (django-esi)
 from esi import app_settings
 from esi.exceptions import ESIBucketLimitException, ESIErrorLimitException
 from esi.openapi_clients import ESIClientProvider
 from esi.rate_limiting import interval_to_seconds
 
+# Local
 from . import __esi_compatibility_date__, __github_url__, __title__, __version__
 
 logger = logging.getLogger(__name__)
@@ -75,82 +81,69 @@ def parse_expires(headers: dict | None):
     return dt.astimezone(timezone.utc)
 
 
-def call_result(operation, **kwargs):
+def _call_esi_operation(
+    operation,
+    use_results: bool = False,
+    **kwargs
+) -> Tuple[Any, Optional[datetime]]:
+    """
+    Internal helper to execute ESI operations with retry logic.
+
+    Args:
+        operation: The ESI operation to call
+        use_results: If True, call .results() instead of .result()
+        **kwargs: Parameters to pass to the operation
+
+    Returns:
+        Tuple of (data, expires_at)
+    """
+    rate_limit_threshold = getattr(settings, "ESI_RATE_LIMIT_SOFT_THRESHOLD", 100)
+    max_backoff_retries = getattr(settings, "ESI_RATE_LIMIT_MAX_RETRIES", 3)
+    spec_backoff_seconds = getattr(settings, "ESI_SPEC_BACKOFF_SECONDS", 60)
+    attempts = 0
+    spec_refreshed = False
+
+    try:
+        # Bind params via __call__ so requestBody is handled correctly by django-esi.
+        op = _bind_operation(_resolve_operation(operation, spec_backoff_seconds), **kwargs)
+        while True:
+            try:
+                # force_refresh=True bypasses the ETag 304 check and returns fresh data
+                method = op.results if use_results else op.result
+                data, response = method(return_response=True, force_refresh=True)
+                _log_rate_limit_remaining(response.headers)
+                _maybe_backoff_on_rate_limit(response.headers, rate_limit_threshold)
+                return to_plain(data), parse_expires(response.headers)
+            except (ESIBucketLimitException, ESIErrorLimitException) as e:
+                attempts += 1
+                wait_seconds = int(getattr(e, "reset", 0) or 0)
+                if wait_seconds <= 0:
+                    wait_seconds = 60
+                logger.warning("ESI rate limit hit (%s). Backing off for %ss.", e, wait_seconds)
+                time.sleep(wait_seconds)
+                if attempts >= max_backoff_retries:
+                    raise
+            except Exception as e:
+                if _should_refresh_spec(e, spec_refreshed):
+                    spec_refreshed = True
+                    _refresh_esi_client()
+                    time.sleep(spec_backoff_seconds)
+                    op = _bind_operation(_rebind_operation(operation, spec_backoff_seconds), **kwargs)
+                    continue
+                raise
+    except Exception as e:
+        logger.error("Error calling ESI operation: %s", e)
+        raise
+
+
+def call_result(operation, **kwargs) -> Tuple[Any, Optional[datetime]]:
     """Execute an OpenAPI operation.result() call and return (data, expires_at)."""
-    rate_limit_threshold = getattr(settings, "ESI_RATE_LIMIT_SOFT_THRESHOLD", 100)
-    max_backoff_retries = getattr(settings, "ESI_RATE_LIMIT_MAX_RETRIES", 3)
-    spec_backoff_seconds = getattr(settings, "ESI_SPEC_BACKOFF_SECONDS", 60)
-    attempts = 0
-    spec_refreshed = False
-    try:
-        # Bind params via __call__ so requestBody is handled correctly by django-esi.
-        op = _bind_operation(_resolve_operation(operation, spec_backoff_seconds), **kwargs)
-        while True:
-            try:
-                # force_refresh=True bypasses the ETag 304 check and returns fresh data
-                data, response = op.result(return_response=True, force_refresh=True)
-                _log_rate_limit_remaining(response.headers)
-                _maybe_backoff_on_rate_limit(response.headers, rate_limit_threshold)
-                return to_plain(data), parse_expires(response.headers)
-            except (ESIBucketLimitException, ESIErrorLimitException) as e:
-                attempts += 1
-                wait_seconds = int(getattr(e, "reset", 0) or 0)
-                if wait_seconds <= 0:
-                    wait_seconds = 60
-                logger.warning("ESI rate limit hit (%s). Backing off for %ss.", e, wait_seconds)
-                time.sleep(wait_seconds)
-                if attempts >= max_backoff_retries:
-                    raise
-            except Exception as e:
-                if _should_refresh_spec(e, spec_refreshed):
-                    spec_refreshed = True
-                    _refresh_esi_client()
-                    time.sleep(spec_backoff_seconds)
-                    op = _bind_operation(_rebind_operation(operation, spec_backoff_seconds), **kwargs)
-                    continue
-                raise
-    except Exception as e:
-        logger.error("Error calling ESI operation: %s", e)
-        raise
+    return _call_esi_operation(operation, use_results=False, **kwargs)
 
 
-def call_results(operation, **kwargs):
+def call_results(operation, **kwargs) -> Tuple[Any, Optional[datetime]]:
     """Execute operation.results() and return (list_data, expires_at) with plain types."""
-    rate_limit_threshold = getattr(settings, "ESI_RATE_LIMIT_SOFT_THRESHOLD", 100)
-    max_backoff_retries = getattr(settings, "ESI_RATE_LIMIT_MAX_RETRIES", 3)
-    spec_backoff_seconds = getattr(settings, "ESI_SPEC_BACKOFF_SECONDS", 60)
-    attempts = 0
-    spec_refreshed = False
-    try:
-        # Bind params via __call__ so requestBody is handled correctly by django-esi.
-        op = _bind_operation(_resolve_operation(operation, spec_backoff_seconds), **kwargs)
-        while True:
-            try:
-                # force_refresh=True bypasses the ETag 304 check and returns fresh data
-                data, response = op.results(return_response=True, force_refresh=True)
-                _log_rate_limit_remaining(response.headers)
-                _maybe_backoff_on_rate_limit(response.headers, rate_limit_threshold)
-                return to_plain(data), parse_expires(response.headers)
-            except (ESIBucketLimitException, ESIErrorLimitException) as e:
-                attempts += 1
-                wait_seconds = int(getattr(e, "reset", 0) or 0)
-                if wait_seconds <= 0:
-                    wait_seconds = 60
-                logger.warning("ESI rate limit hit (%s). Backing off for %ss.", e, wait_seconds)
-                time.sleep(wait_seconds)
-                if attempts >= max_backoff_retries:
-                    raise
-            except Exception as e:
-                if _should_refresh_spec(e, spec_refreshed):
-                    spec_refreshed = True
-                    _refresh_esi_client()
-                    time.sleep(spec_backoff_seconds)
-                    op = _bind_operation(_rebind_operation(operation, spec_backoff_seconds), **kwargs)
-                    continue
-                raise
-    except Exception as e:
-        logger.error("Error calling ESI operation: %s", e)
-        raise
+    return _call_esi_operation(operation, use_results=True, **kwargs)
 
 
 def _bind_operation(operation, **kwargs):

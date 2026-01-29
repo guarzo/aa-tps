@@ -2,24 +2,47 @@
 
 # Standard Library
 import logging
-import requests
 import time
 from calendar import monthrange
 from datetime import datetime, timezone as dt_timezone
+
+# Third-party
+import requests
+from celery import shared_task
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from django.utils import timezone
+
+# Django
 from django.conf import settings
 from django.core.cache import cache
-from celery import shared_task
-from .models import MonthlyKillmail, KillmailParticipant
-from .esi import esi, call_result
-from allianceauth.eveonline.models import EveCharacter
-from allianceauth.authentication.models import CharacterOwnership
-from eveuniverse.models import EveSolarSystem, EveType
 from django.db import transaction
+from django.utils import timezone
+
+# Alliance Auth
+from allianceauth.authentication.models import CharacterOwnership
+from allianceauth.eveonline.models import EveCharacter
+
+# Eve Universe
+from eveuniverse.models import EveSolarSystem, EveType
+
+# Local
+from .esi import call_result, esi
+from .models import KillmailParticipant, MonthlyKillmail
+from .utils import get_current_month_range
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting constants
+ZKILL_MIN_REQUEST_INTERVAL = 0.5  # Minimum seconds between zKillboard API calls
+ZKILL_REQUEST_TIMEOUT = 30  # Timeout for zKillboard requests in seconds
+
+# Pagination constants
+ZKILL_MAX_PAGES = 20  # Maximum pages to fetch per entity (zKillboard limit)
+ZKILL_PAGE_SIZE = 200  # Expected results per page from zKillboard
+
+# Task limits
+TASK_MAX_RUNTIME_SECONDS = 7200  # Maximum runtime for pull task (2 hours)
+TASK_LOCK_TIMEOUT = 7200  # Cache lock timeout in seconds
 
 
 # =============================================================================
@@ -34,17 +57,6 @@ def get_all_auth_characters():
     return EveCharacter.objects.filter(
         character_ownership__isnull=False
     ).select_related('character_ownership__user')
-
-
-def get_current_month_range():
-    """
-    Return (start_datetime, end_datetime) for current month in UTC.
-    """
-    now = datetime.now(dt_timezone.utc)
-    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    _, last_day = monthrange(now.year, now.month)
-    end = now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
-    return start, end
 
 
 def get_auth_character_ids():
@@ -89,8 +101,8 @@ def _zkill_get(url):
     global _last_zkill_call
     now = time.time()
     elapsed = now - _last_zkill_call
-    if elapsed < 0.5:
-        sleep_time = 0.5 - elapsed
+    if elapsed < ZKILL_MIN_REQUEST_INTERVAL:
+        sleep_time = ZKILL_MIN_REQUEST_INTERVAL - elapsed
         time.sleep(sleep_time)
 
     contact_email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'Unknown')
@@ -100,19 +112,21 @@ def _zkill_get(url):
     }
 
     logger.debug(f"Fetching from zKillboard: {url}")
-    response = _zkill_session.get(url, headers=headers, timeout=30)
+    response = _zkill_session.get(url, headers=headers, timeout=ZKILL_REQUEST_TIMEOUT)
     _last_zkill_call = time.time()
     return response
 
 
 def _fetch_universe_names(ids):
+    """Fetch entity names from ESI."""
     try:
         data, _ = call_result(
             lambda: esi.client.Universe.PostUniverseNames,
             body=ids
         )
         return data
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to fetch universe names for {ids}: {e}")
         return None
 
 
@@ -168,8 +182,8 @@ def get_killmail_time(km_data):
             if timezone.is_naive(km_time):
                 km_time = timezone.make_aware(km_time)
             return km_time
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Failed to parse killmail_time '{km_time_str}': {e}")
 
     # Try ESI if we have ID and Hash
     km_id = km_data.get('killmail_id')
@@ -184,8 +198,8 @@ def get_killmail_time(km_data):
                     if timezone.is_naive(km_time):
                         km_time = timezone.make_aware(km_time)
                     return km_time
-                except Exception:
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"Failed to parse ESI killmail_time '{km_time_str}': {e}")
     return None
 
 
@@ -193,7 +207,7 @@ def get_killmail_time(km_data):
 # Monthly Killmail Data Collection
 # =============================================================================
 
-@shared_task(time_limit=7200)
+@shared_task(time_limit=TASK_MAX_RUNTIME_SECONDS)
 def pull_monthly_killmails():
     """
     Pull killmails for all authenticated users for the current month.
@@ -205,7 +219,7 @@ def pull_monthly_killmails():
     3. Then pull individual chars only if needed
     """
     lock_id = "aatps-pull-monthly-killmails-lock"
-    if not cache.add(lock_id, True, 7200):
+    if not cache.add(lock_id, True, TASK_LOCK_TIMEOUT):
         logger.warning("Monthly killmail pull task is already running. Skipping.")
         return "Task already running"
 
@@ -262,6 +276,11 @@ def _pull_monthly_killmails_logic():
     # Get all auth character IDs for participant matching
     auth_char_ids = get_auth_character_ids()
 
+    # Pre-fetch character-to-user mapping to avoid N+1 queries
+    char_user_map = {}
+    for ownership in CharacterOwnership.objects.select_related('user', 'character'):
+        char_user_map[ownership.character.character_id] = ownership.user
+
     # Local caches
     context = {
         'resolved_names': {},
@@ -269,6 +288,7 @@ def _pull_monthly_killmails_logic():
         'resolved_systems': {},
         'resolved_types': {},
         'auth_char_ids': auth_char_ids,
+        'char_user_map': char_user_map,
     }
 
     processed_km_ids = set()
@@ -299,7 +319,7 @@ def _pull_monthly_killmails_logic():
 
     # Pull alliances
     for i, alliance_id in enumerate(alliances_to_pull, 1):
-        if time.time() - start_time > 7200:
+        if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
             break
 
@@ -308,7 +328,7 @@ def _pull_monthly_killmails_logic():
 
     # Pull corps not covered by alliances
     for i, corp_id in enumerate(corps_to_pull, 1):
-        if time.time() - start_time > 7200:
+        if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
             break
 
@@ -317,7 +337,7 @@ def _pull_monthly_killmails_logic():
 
     # Pull solo characters
     for i, char_id in enumerate(solo_characters, 1):
-        if time.time() - start_time > 7200:
+        if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
             break
 
@@ -339,9 +359,8 @@ def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, pro
     zKillboard limits pages to 20 max.
     """
     page = 1
-    max_pages = 20
 
-    while page <= max_pages:
+    while page <= ZKILL_MAX_PAGES:
         kms = fetch_from_zkill(entity_type, entity_id, year=year, month=month, page=page)
         if not kms:
             break
@@ -350,7 +369,7 @@ def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, pro
         new_on_page = process_callback(kms)
         logger.debug(f"Processed {new_on_page} new killmails from page {page}")
 
-        if len(kms) < 200:  # Last page
+        if len(kms) < ZKILL_PAGE_SIZE:  # Last page
             break
 
         # Check if we've gone past the month start
@@ -531,8 +550,8 @@ def process_monthly_killmail(km_data, context, month_start):
                         continue
                 context.setdefault('resolved_characters', {})[char_id] = char
 
-            # Get user for character
-            user = get_user_for_character(char_id)
+            # Get user for character (use pre-fetched map from context)
+            user = context.get('char_user_map', {}).get(char_id)
 
             # Resolve ship name for participant
             participant_ship_id = participant_data.get('ship_type_id', 0)

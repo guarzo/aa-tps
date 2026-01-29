@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.handlers.wsgi import WSGIRequest
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Subquery
 from django.db.models.functions import TruncDay
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render
@@ -14,23 +14,12 @@ from django.shortcuts import render
 from allianceauth.eveonline.models import EveCharacter
 
 from .models import MonthlyKillmail, KillmailParticipant
+from .utils import get_current_month_range, get_month_range, format_isk, safe_int
 
-
-def get_current_month_range():
-    """Return (start_datetime, end_datetime) for current month in UTC."""
-    now = datetime.now(dt_timezone.utc)
-    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    _, last_day = monthrange(now.year, now.month)
-    end = now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
-    return start, end
-
-
-def get_month_range(year, month):
-    """Return (start_datetime, end_datetime) for a specific month in UTC."""
-    start = datetime(year, month, 1, 0, 0, 0, 0, tzinfo=dt_timezone.utc)
-    _, last_day = monthrange(year, month)
-    end = datetime(year, month, last_day, 23, 59, 59, 999999, tzinfo=dt_timezone.utc)
-    return start, end
+# API pagination limits
+MAX_PAGE_LENGTH = 100
+MAX_RECENT_KILLS_LIMIT = 100
+MAX_TOP_KILLS_LIMIT = 50
 
 
 def get_month_params_from_request(request):
@@ -57,22 +46,6 @@ def get_month_params_from_request(request):
     # Default to current month
     start, end = get_current_month_range()
     return start, end, now.year, now.month, True
-
-
-def format_isk(value):
-    """Format ISK value for display."""
-    if value is None:
-        return "0"
-    value = float(value)
-    if value >= 1_000_000_000_000:
-        return f"{value / 1_000_000_000_000:.2f}T"
-    elif value >= 1_000_000_000:
-        return f"{value / 1_000_000_000:.2f}B"
-    elif value >= 1_000_000:
-        return f"{value / 1_000_000:.2f}M"
-    elif value >= 1_000:
-        return f"{value / 1_000:.2f}K"
-    return f"{value:.0f}"
 
 
 @login_required
@@ -156,25 +129,26 @@ def stats_api(request: WSGIRequest) -> JsonResponse:
         killmail__killmail_time__lte=month_end,
     )
 
+    # Use subqueries instead of materializing sets in memory
     # Kills: killmails where we have non-victim participants
-    kill_km_ids = participants.filter(
+    kill_km_subquery = participants.filter(
         is_victim=False
-    ).values_list('killmail_id', flat=True).distinct()
+    ).values('killmail_id').distinct()
 
     # Losses: killmails where we have victim participants
-    loss_km_ids = participants.filter(
+    loss_km_subquery = participants.filter(
         is_victim=True
-    ).values_list('killmail_id', flat=True).distinct()
+    ).values('killmail_id').distinct()
 
     # Get aggregates for kills
-    kills_qs = killmails.filter(killmail_id__in=kill_km_ids)
+    kills_qs = killmails.filter(killmail_id__in=Subquery(kill_km_subquery))
     kills_stats = kills_qs.aggregate(
         total_kills=Count('killmail_id'),
         total_kill_value=Sum('total_value')
     )
 
     # Get aggregates for losses
-    losses_qs = killmails.filter(killmail_id__in=loss_km_ids)
+    losses_qs = killmails.filter(killmail_id__in=Subquery(loss_km_subquery))
     losses_stats = losses_qs.aggregate(
         total_losses=Count('killmail_id'),
         total_loss_value=Sum('total_value')
@@ -222,21 +196,16 @@ def activity_api(request: WSGIRequest) -> JsonResponse:
     participants = KillmailParticipant.objects.filter(
         killmail__killmail_time__gte=month_start,
         killmail__killmail_time__lte=month_end,
-    ).select_related('killmail')
-
-    # Get kill killmail IDs (non-victim participants)
-    kill_km_ids = set(
-        participants.filter(is_victim=False)
-        .values_list('killmail_id', flat=True)
-        .distinct()
     )
 
-    # Get loss killmail IDs (victim participants)
-    loss_km_ids = set(
-        participants.filter(is_victim=True)
-        .values_list('killmail_id', flat=True)
-        .distinct()
-    )
+    # Use subqueries instead of materializing sets in memory
+    kill_km_subquery = participants.filter(
+        is_victim=False
+    ).values('killmail_id').distinct()
+
+    loss_km_subquery = participants.filter(
+        is_victim=True
+    ).values('killmail_id').distinct()
 
     # Get daily kills
     daily_kills = (
@@ -244,7 +213,7 @@ def activity_api(request: WSGIRequest) -> JsonResponse:
         .filter(
             killmail_time__gte=month_start,
             killmail_time__lte=month_end,
-            killmail_id__in=kill_km_ids
+            killmail_id__in=Subquery(kill_km_subquery)
         )
         .annotate(day=TruncDay('killmail_time'))
         .values('day')
@@ -261,7 +230,7 @@ def activity_api(request: WSGIRequest) -> JsonResponse:
         .filter(
             killmail_time__gte=month_start,
             killmail_time__lte=month_end,
-            killmail_id__in=loss_km_ids
+            killmail_id__in=Subquery(loss_km_subquery)
         )
         .annotate(day=TruncDay('killmail_time'))
         .values('day')
@@ -311,9 +280,9 @@ def leaderboard_api(request: WSGIRequest) -> JsonResponse:
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
 
     # DataTables parameters
-    draw = int(request.GET.get('draw', 1))
-    start = int(request.GET.get('start', 0))
-    length = int(request.GET.get('length', 10))
+    draw = safe_int(request.GET.get('draw'), default=1, min_val=1)
+    start = safe_int(request.GET.get('start'), default=0, min_val=0)
+    length = safe_int(request.GET.get('length'), default=10, min_val=1, max_val=MAX_PAGE_LENGTH)
     search_value = request.GET.get('search[value]', '').lower()
 
     # Get all non-victim participations for the month
@@ -419,7 +388,7 @@ def leaderboard_api(request: WSGIRequest) -> JsonResponse:
 def top_kills_api(request: WSGIRequest) -> JsonResponse:
     """Returns top kills for the month."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
-    limit = int(request.GET.get('limit', 10))
+    limit = safe_int(request.GET.get('limit'), default=10, min_val=1, max_val=MAX_TOP_KILLS_LIMIT)
 
     # Get kill killmail IDs (killmails with non-victim participants)
     kill_km_ids = KillmailParticipant.objects.filter(
@@ -464,17 +433,14 @@ def ship_stats_api(request: WSGIRequest) -> JsonResponse:
         killmail__killmail_time__lte=month_end,
     )
 
-    # Get kill and loss killmail IDs
-    kill_km_ids = set(
-        participants.filter(is_victim=False)
-        .values_list('killmail_id', flat=True)
-        .distinct()
-    )
-    loss_km_ids = set(
-        participants.filter(is_victim=True)
-        .values_list('killmail_id', flat=True)
-        .distinct()
-    )
+    # Use subqueries instead of materializing sets in memory
+    kill_km_subquery = participants.filter(
+        is_victim=False
+    ).values('killmail_id').distinct()
+
+    loss_km_subquery = participants.filter(
+        is_victim=True
+    ).values('killmail_id').distinct()
 
     # Get ship group stats for kills
     kill_stats = (
@@ -482,7 +448,7 @@ def ship_stats_api(request: WSGIRequest) -> JsonResponse:
         .filter(
             killmail_time__gte=month_start,
             killmail_time__lte=month_end,
-            killmail_id__in=kill_km_ids
+            killmail_id__in=Subquery(kill_km_subquery)
         )
         .values('ship_group_name')
         .annotate(count=Count('killmail_id'))
@@ -495,7 +461,7 @@ def ship_stats_api(request: WSGIRequest) -> JsonResponse:
         .filter(
             killmail_time__gte=month_start,
             killmail_time__lte=month_end,
-            killmail_id__in=loss_km_ids
+            killmail_id__in=Subquery(loss_km_subquery)
         )
         .values('ship_group_name')
         .annotate(count=Count('killmail_id'))
@@ -650,7 +616,7 @@ def my_stats_api(request: WSGIRequest) -> JsonResponse:
 def recent_kills_api(request: WSGIRequest) -> JsonResponse:
     """Returns recent killmails for the month."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
-    limit = int(request.GET.get('limit', 50))
+    limit = safe_int(request.GET.get('limit'), default=50, min_val=1, max_val=MAX_RECENT_KILLS_LIMIT)
     user_only = request.GET.get('user_only', 'false').lower() == 'true'
 
     # Base query for killmails with participants

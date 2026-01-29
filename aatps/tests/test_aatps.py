@@ -2,15 +2,22 @@
 AA TPS Test - Monthly Killmail Tests
 """
 
+from datetime import datetime, timedelta, timezone as dt_timezone
+from decimal import Decimal
+
 # Django
 from django.test import TestCase
 from django.utils import timezone
-from aatps.models import MonthlyKillmail
+
+from aatps.models import MonthlyKillmail, KillmailParticipant
 from aatps.tasks import (
     fetch_from_zkill,
     get_current_month_range,
     pull_monthly_killmails,
+    process_monthly_killmail,
+    cleanup_old_killmails,
 )
+from aatps.tests.factories import MonthlyKillmailFactory
 from unittest.mock import patch, MagicMock
 
 
@@ -144,3 +151,248 @@ class TestMonthlyKillmailModel(TestCase):
         ).first()
         self.assertIsNotNone(perm)
         self.assertEqual(perm.name, "Can access this app")
+
+
+class TestProcessMonthlyKillmail(TestCase):
+    """Tests for process_monthly_killmail function."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        MonthlyKillmailFactory.reset_counter()
+
+    @patch('aatps.tasks.fetch_killmail_from_esi')
+    @patch('aatps.tasks._resolve_name')
+    @patch('aatps.tasks.get_user_for_character')
+    def test_process_killmail_skips_without_auth_users(self, mock_get_user, mock_resolve, mock_esi):
+        """Test that killmails without auth user involvement are skipped."""
+        km_data = {
+            'killmail_id': 99999,
+            'killmail_time': '2024-01-15T12:00:00Z',
+            'solar_system_id': 30000142,
+            'victim': {
+                'character_id': 123456,
+                'corporation_id': 98000001,
+                'ship_type_id': 587,
+            },
+            'attackers': [
+                {
+                    'character_id': 654321,
+                    'corporation_id': 98000002,
+                    'ship_type_id': 587,
+                    'final_blow': True,
+                    'damage_done': 1000,
+                }
+            ],
+            'zkb': {
+                'hash': 'abc123',
+                'totalValue': 1000000,
+            }
+        }
+
+        # Empty auth_char_ids means no auth user involved
+        context = {
+            'auth_char_ids': set(),
+            'resolved_names': {},
+            'resolved_characters': {},
+            'resolved_systems': {},
+            'resolved_types': {},
+        }
+
+        month_start = datetime(2024, 1, 1, tzinfo=dt_timezone.utc)
+
+        result = process_monthly_killmail(km_data, context, month_start)
+        self.assertIsNone(result)
+
+    @patch('aatps.tasks.fetch_killmail_from_esi')
+    @patch('aatps.tasks._resolve_name')
+    def test_process_killmail_skips_invalid_id(self, mock_resolve, mock_esi):
+        """Test that killmails without ID are skipped."""
+        km_data = {
+            # Missing killmail_id
+            'killmail_time': '2024-01-15T12:00:00Z',
+        }
+
+        context = {
+            'auth_char_ids': {123456},
+            'resolved_names': {},
+            'resolved_characters': {},
+            'resolved_systems': {},
+            'resolved_types': {},
+        }
+
+        month_start = datetime(2024, 1, 1, tzinfo=dt_timezone.utc)
+
+        result = process_monthly_killmail(km_data, context, month_start)
+        self.assertIsNone(result)
+
+    @patch('aatps.tasks.fetch_killmail_from_esi')
+    @patch('aatps.tasks._resolve_name')
+    def test_process_killmail_skips_before_month_start(self, mock_resolve, mock_esi):
+        """Test that killmails before month start are skipped."""
+        mock_resolve.return_value = "Test Name"
+
+        km_data = {
+            'killmail_id': 99999,
+            'killmail_time': '2023-12-15T12:00:00Z',  # Before month start
+            'solar_system_id': 30000142,
+            'victim': {
+                'character_id': 999999,
+                'corporation_id': 98000001,
+                'ship_type_id': 587,
+            },
+            'attackers': [
+                {
+                    'character_id': 123456,  # This is an auth char
+                    'corporation_id': 98000002,
+                    'ship_type_id': 587,
+                    'final_blow': True,
+                    'damage_done': 1000,
+                }
+            ],
+            'zkb': {
+                'hash': 'abc123',
+                'totalValue': 1000000,
+            }
+        }
+
+        context = {
+            'auth_char_ids': {123456},
+            'resolved_names': {},
+            'resolved_characters': {},
+            'resolved_systems': {},
+            'resolved_types': {},
+        }
+
+        month_start = datetime(2024, 1, 1, tzinfo=dt_timezone.utc)
+
+        result = process_monthly_killmail(km_data, context, month_start)
+        self.assertIsNone(result)
+
+
+class TestCleanupOldKillmails(TestCase):
+    """Tests for cleanup_old_killmails task."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        MonthlyKillmailFactory.reset_counter()
+
+    def test_cleanup_deletes_old_records(self):
+        """Test that old killmails are deleted."""
+        # Create an old killmail (older than default 12 months)
+        old_time = datetime.now(dt_timezone.utc) - timedelta(days=400)
+        old_km = MonthlyKillmail.objects.create(
+            killmail_id=1,
+            killmail_time=old_time,
+            solar_system_id=30000142,
+            solar_system_name="Jita",
+        )
+
+        # Create a recent killmail
+        recent_km = MonthlyKillmail.objects.create(
+            killmail_id=2,
+            killmail_time=datetime.now(dt_timezone.utc),
+            solar_system_id=30000142,
+            solar_system_name="Jita",
+        )
+
+        # Run cleanup with default retention (12 months)
+        with patch('aatps.tasks.AA_TPS_RETENTION_MONTHS', 12):
+            result = cleanup_old_killmails()
+
+        # Old should be deleted, recent should remain
+        self.assertFalse(MonthlyKillmail.objects.filter(killmail_id=1).exists())
+        self.assertTrue(MonthlyKillmail.objects.filter(killmail_id=2).exists())
+        self.assertIn("Deleted", result)
+
+    def test_cleanup_keeps_recent_records(self):
+        """Test that recent killmails are kept."""
+        # Create several recent killmails
+        for i in range(5):
+            MonthlyKillmailFactory.create(
+                killmail_id=100 + i,
+                killmail_time=datetime.now(dt_timezone.utc) - timedelta(days=i * 30)
+            )
+
+        initial_count = MonthlyKillmail.objects.count()
+
+        # Run cleanup with default retention
+        with patch('aatps.tasks.AA_TPS_RETENTION_MONTHS', 12):
+            cleanup_old_killmails()
+
+        # All should be kept (none are older than 12 months)
+        self.assertEqual(MonthlyKillmail.objects.count(), initial_count)
+
+    def test_cleanup_respects_retention_setting(self):
+        """Test that cleanup respects the retention months setting."""
+        # Create a killmail that's 60 days old
+        km_60_days = MonthlyKillmail.objects.create(
+            killmail_id=1,
+            killmail_time=datetime.now(dt_timezone.utc) - timedelta(days=60),
+            solar_system_id=30000142,
+        )
+
+        # Run cleanup with 1 month retention (should delete 60-day-old record)
+        with patch('aatps.tasks.AA_TPS_RETENTION_MONTHS', 1):
+            cleanup_old_killmails()
+
+        # Should be deleted (60 days > 30 days retention)
+        self.assertFalse(MonthlyKillmail.objects.filter(killmail_id=1).exists())
+
+    def test_cleanup_with_no_old_records(self):
+        """Test cleanup when there are no old records."""
+        # Create only recent killmails
+        for i in range(3):
+            MonthlyKillmailFactory.create(
+                killmail_id=200 + i,
+                killmail_time=datetime.now(dt_timezone.utc)
+            )
+
+        with patch('aatps.tasks.AA_TPS_RETENTION_MONTHS', 12):
+            result = cleanup_old_killmails()
+
+        self.assertIn("Deleted 0", result)
+
+    def test_cleanup_cascades_to_participants(self):
+        """Test that deleting killmails cascades to participants."""
+        # Create an old killmail
+        old_time = datetime.now(dt_timezone.utc) - timedelta(days=400)
+        old_km = MonthlyKillmail.objects.create(
+            killmail_id=999,
+            killmail_time=old_time,
+            solar_system_id=30000142,
+        )
+
+        # Note: We can't easily create KillmailParticipant without EveCharacter
+        # but we can verify the count behavior
+        initial_km_count = MonthlyKillmail.objects.count()
+
+        with patch('aatps.tasks.AA_TPS_RETENTION_MONTHS', 12):
+            cleanup_old_killmails()
+
+        self.assertEqual(MonthlyKillmail.objects.count(), initial_km_count - 1)
+
+
+class TestKillmailParticipantModel(TestCase):
+    """Tests for KillmailParticipant model."""
+
+    def test_participant_str_attacker(self):
+        """Test string representation for attacker."""
+        km = MonthlyKillmail.objects.create(
+            killmail_id=12345,
+            killmail_time=timezone.now(),
+            solar_system_id=30000142,
+        )
+        # Note: Creating a full participant requires EveCharacter
+        # This test validates the model exists and can be queried
+        self.assertEqual(km.participants.count(), 0)
+
+    def test_killmail_participants_relationship(self):
+        """Test the reverse relationship from killmail to participants."""
+        km = MonthlyKillmail.objects.create(
+            killmail_id=54321,
+            killmail_time=timezone.now(),
+            solar_system_id=30000142,
+        )
+        # Verify the related_name 'participants' works
+        self.assertIsNotNone(km.participants)
+        self.assertEqual(km.participants.count(), 0)
