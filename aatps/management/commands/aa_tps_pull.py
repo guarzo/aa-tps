@@ -32,13 +32,25 @@ def _configure_logging(verbose):
         "httpx",
         "urllib3",
         "requests",
+        "allianceauth",
     ):
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
+    # Configure aatps logger with a handler if it doesn't have one
+    aatps_logger = logging.getLogger("aatps")
     if verbose:
-        logging.getLogger("aatps").setLevel(logging.DEBUG)
+        aatps_logger.setLevel(logging.DEBUG)
     else:
-        logging.getLogger("aatps").setLevel(logging.INFO)
+        aatps_logger.setLevel(logging.INFO)
+
+    # Ensure the logger has a handler (for management command context)
+    if not aatps_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+        formatter = logging.Formatter('[%(levelname)s] %(message)s')
+        handler.setFormatter(formatter)
+        aatps_logger.addHandler(handler)
+        aatps_logger.propagate = False  # Don't double-log to root
 
 
 class Command(BaseCommand):
