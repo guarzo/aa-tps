@@ -38,7 +38,9 @@ class ViewTestBase(TestCase):
     def setUp(self):
         """Set up test client."""
         self.client = Client()
-        self.client.login(username="testuser", password="testpass")
+        # Refetch user to ensure permission cache is current
+        self.user = User.objects.get(pk=self.user.pk)
+        self.client.force_login(self.user)
 
         # Reset factory counter between tests
         MonthlyKillmailFactory.reset_counter()

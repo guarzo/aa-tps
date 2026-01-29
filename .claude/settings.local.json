@@ -1,18 +1,20 @@
 {
-    "permissions": {
-        "allow": [
-            "Bash(tree:*)",
-            "Bash(DJANGO_SETTINGS_MODULE=testauth.settings.local python -m django makemigrations:*)",
-            "Bash(ls:*)",
-            "Bash(python -m py_compile:*)",
-            "Bash(python:*)",
-            "WebSearch",
-            "WebFetch(domain:gitlab.com)",
-            "Bash(grep:*)",
-            "Bash(wc:*)",
-            "Bash(pip show:*)",
-            "Bash(pre-commit run:*)",
-            "Bash(ec .claude/settings.local.json package.json)"
-        ]
-    }
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=testauth.settings.local python -m django makemigrations:*)",
+      "Bash(ls:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python:*)",
+      "WebSearch",
+      "WebFetch(domain:gitlab.com)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(pip show:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(ec .claude/settings.local.json package.json)",
+      "Bash(tox:*)",
+      "Bash(pip install:*)"
+    ]
+  }
 }

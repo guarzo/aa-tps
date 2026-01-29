@@ -297,7 +297,7 @@ class TestCleanupOldKillmails(TestCase):
         )
 
         # Run cleanup with default retention (12 months)
-        with patch("aatps.tasks.AA_TPS_RETENTION_MONTHS", 12):
+        with patch("aatps.app_settings.AA_TPS_RETENTION_MONTHS", 12):
             result = cleanup_old_killmails()
 
         # Old should be deleted, recent should remain
@@ -316,7 +316,7 @@ class TestCleanupOldKillmails(TestCase):
         initial_count = MonthlyKillmail.objects.count()
 
         # Run cleanup with default retention
-        with patch("aatps.tasks.AA_TPS_RETENTION_MONTHS", 12):
+        with patch("aatps.app_settings.AA_TPS_RETENTION_MONTHS", 12):
             cleanup_old_killmails()
 
         # All should be kept (none are older than 12 months)
@@ -332,7 +332,7 @@ class TestCleanupOldKillmails(TestCase):
         )
 
         # Run cleanup with 1 month retention (should delete 60-day-old record)
-        with patch("aatps.tasks.AA_TPS_RETENTION_MONTHS", 1):
+        with patch("aatps.app_settings.AA_TPS_RETENTION_MONTHS", 1):
             cleanup_old_killmails()
 
         # Should be deleted (60 days > 30 days retention)
@@ -344,7 +344,7 @@ class TestCleanupOldKillmails(TestCase):
         for i in range(3):
             MonthlyKillmailFactory.create(killmail_id=200 + i, killmail_time=datetime.now(dt_timezone.utc))
 
-        with patch("aatps.tasks.AA_TPS_RETENTION_MONTHS", 12):
+        with patch("aatps.app_settings.AA_TPS_RETENTION_MONTHS", 12):
             result = cleanup_old_killmails()
 
         self.assertIn("Deleted 0", result)
@@ -363,7 +363,7 @@ class TestCleanupOldKillmails(TestCase):
         # but we can verify the count behavior
         initial_km_count = MonthlyKillmail.objects.count()
 
-        with patch("aatps.tasks.AA_TPS_RETENTION_MONTHS", 12):
+        with patch("aatps.app_settings.AA_TPS_RETENTION_MONTHS", 12):
             cleanup_old_killmails()
 
         self.assertEqual(MonthlyKillmail.objects.count(), initial_km_count - 1)

@@ -324,7 +324,10 @@
                 let html = '';
                 kills.forEach(kill => {
                     html += `
-                        <div class="kill-card p-3 mb-2 d-flex align-items-center">
+                        <a href="https://zkillboard.com/kill/${kill.killmail_id}/"
+                            target="_blank"
+                            class="kill-card p-3 mb-2 d-flex align-items-center text-decoration-none"
+                            title="View on zKillboard">
                             <div class="ship-render me-3">
                                 <img src="https://images.evetech.net/types/${kill.ship_type_id}/render?size=64"
                                     alt="${kill.ship_type_name}"
@@ -333,20 +336,17 @@
                             </div>
                             <div class="flex-grow-1 min-width-0">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <strong class="text-truncate" title="${kill.ship_type_name}">${kill.ship_type_name}</strong>
+                                    <strong class="text-truncate text-light" title="${kill.ship_type_name}">${kill.ship_type_name}</strong>
                                     <span class="text-success isk-value ms-2">${kill.total_value_formatted}</span>
                                 </div>
                                 <small class="text-muted text-truncate d-block" title="${kill.victim_name} (${kill.victim_corp_name})">
                                     ${kill.victim_name} (${kill.victim_corp_name})
                                 </small>
                             </div>
-                            <a href="https://zkillboard.com/kill/${kill.killmail_id}/"
-                                target="_blank"
-                                class="btn btn-sm btn-outline-secondary ms-2 zkill-link"
-                                title="View on zKillboard">
+                            <span class="ms-2 text-muted">
                                 <i class="fas fa-external-link-alt"></i>
-                            </a>
-                        </div>`;
+                            </span>
+                        </a>`;
                 });
 
                 container.innerHTML = html;

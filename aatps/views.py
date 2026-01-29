@@ -52,7 +52,7 @@ def get_month_params_from_request(request):
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def dashboard(request: WSGIRequest) -> HttpResponse:
     """Main dashboard showing current month activity."""
     month_start, month_end = get_current_month_range()
@@ -74,7 +74,7 @@ def dashboard(request: WSGIRequest) -> HttpResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def historical_view(request: WSGIRequest, year: int, month: int) -> HttpResponse:
     """View historical data for a specific month."""
     now = datetime.now(dt_timezone.utc)
@@ -111,7 +111,7 @@ def historical_view(request: WSGIRequest, year: int, month: int) -> HttpResponse
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def stats_api(request: WSGIRequest) -> JsonResponse:
     """Return overall statistics for the dashboard."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -176,7 +176,7 @@ def stats_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def activity_api(request: WSGIRequest) -> JsonResponse:
     """Returns daily activity data for charts."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -247,7 +247,7 @@ def activity_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def leaderboard_api(request: WSGIRequest) -> JsonResponse:
     """Server-side DataTables API for leaderboard."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -356,7 +356,7 @@ def leaderboard_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def top_kills_api(request: WSGIRequest) -> JsonResponse:
     """Returns top kills for the month."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -400,7 +400,7 @@ def top_kills_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def ship_stats_api(request: WSGIRequest) -> JsonResponse:
     """Returns ship class statistics for the month."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -464,7 +464,7 @@ def ship_stats_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def my_stats_api(request: WSGIRequest) -> JsonResponse:
     """Return personal statistics for the current user."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)
@@ -582,7 +582,7 @@ def my_stats_api(request: WSGIRequest) -> JsonResponse:
 
 
 @login_required
-@permission_required("aatps.basic_access")
+@permission_required("aatps.basic_access", raise_exception=True)
 def recent_kills_api(request: WSGIRequest) -> JsonResponse:
     """Returns recent killmails for the month."""
     month_start, month_end, year, month, is_current = get_month_params_from_request(request)

@@ -78,11 +78,20 @@
     transition: all 0.2s ease;
     background-color: rgb(255 255 255 / 2%);
     border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    color: inherit;
 }
 
 .kill-card:hover {
-    background-color: rgb(255 255 255 / 5%);
-    transform: translateX(2px);
+    background-color: rgb(255 255 255 / 8%);
+    transform: translateX(4px);
+    border-left-color: #20c997;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+    color: inherit;
+}
+
+.kill-card:hover .fa-external-link-alt {
+    color: #20c997;
 }
 
 .kill-card.loss {
