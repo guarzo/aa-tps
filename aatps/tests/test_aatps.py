@@ -5,13 +5,11 @@ AA TPS Test - Monthly Killmail Tests
 # Django
 from django.test import TestCase
 from django.utils import timezone
-from aatps.models import MonthlyKillmail, KillmailParticipant
+from aatps.models import MonthlyKillmail
 from aatps.tasks import (
     fetch_from_zkill,
-    pull_monthly_killmails,
     get_current_month_range,
-    get_all_auth_characters,
-    get_auth_character_ids,
+    pull_monthly_killmails,
 )
 from unittest.mock import patch, MagicMock
 

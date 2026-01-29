@@ -1,20 +1,22 @@
 """Shared configuration for the Django-ESI OpenAPI 3.1 client."""
 
 from __future__ import annotations
+
 import logging
 import time
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from hashlib import md5
+
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
-from email.utils import parsedate_to_datetime
 from esi import app_settings
-from esi.openapi_clients import ESIClientProvider
-from bravado.exception import HTTPNotModified
 from esi.exceptions import ESIBucketLimitException, ESIErrorLimitException
+from esi.openapi_clients import ESIClientProvider
 from esi.rate_limiting import interval_to_seconds
 
-from . import __title__, __version__, __github_url__, __esi_compatibility_date__
+from . import __esi_compatibility_date__, __github_url__, __title__, __version__
 
 logger = logging.getLogger(__name__)
 
@@ -283,11 +285,7 @@ def _get_bucket_ttl_seconds(group: str | None) -> int | None:
     return ttl + 1
 
 
-"""
-Helpers for caching ESI expiry timestamps in Django's cache backend.
-"""
-
-from datetime import datetime
+# Helpers for caching ESI expiry timestamps in Django's cache backend.
 
 
 def expiry_cache_key(kind: str, identifier) -> str:

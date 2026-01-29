@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.handlers.wsgi import WSGIRequest
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Count, Sum
 from django.db.models.functions import TruncDay
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render
