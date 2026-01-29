@@ -3,6 +3,7 @@
 # Django
 from django.apps import AppConfig
 
+# AA Campaign
 # AA TPS
 from aatps import __version__
 

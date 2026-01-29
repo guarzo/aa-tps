@@ -1,3 +1,4 @@
+# Django
 from django.db import migrations, models
 
 
@@ -13,24 +14,24 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ('aatps', '0008_remove_legacy_models'),
+        ("aatps", "0008_remove_legacy_models"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='killmailparticipant',
-            index=models.Index(fields=['is_victim'], name='aatps_parti_is_vict_idx'),
+            model_name="killmailparticipant",
+            index=models.Index(fields=["is_victim"], name="aatps_parti_is_vict_idx"),
         ),
         migrations.AddIndex(
-            model_name='killmailparticipant',
-            index=models.Index(fields=['is_final_blow'], name='aatps_parti_final_blow_idx'),
+            model_name="killmailparticipant",
+            index=models.Index(fields=["is_final_blow"], name="aatps_parti_final_blow_idx"),
         ),
         migrations.AddIndex(
-            model_name='killmailparticipant',
-            index=models.Index(fields=['user', 'is_victim'], name='aatps_parti_user_victim_idx'),
+            model_name="killmailparticipant",
+            index=models.Index(fields=["user", "is_victim"], name="aatps_parti_user_victim_idx"),
         ),
         migrations.AddIndex(
-            model_name='monthlykillmail',
-            index=models.Index(fields=['killmail_time', 'total_value'], name='aatps_km_time_value_idx'),
+            model_name="monthlykillmail",
+            index=models.Index(fields=["killmail_time", "total_value"], name="aatps_km_time_value_idx"),
         ),
     ]

@@ -8,13 +8,14 @@ import time
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from hashlib import md5
-from typing import Any, Optional, Tuple
+from typing import Any
 
 # Django
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
+# Alliance Auth
 # Third-party (django-esi)
 from esi import app_settings
 from esi.exceptions import ESIBucketLimitException, ESIErrorLimitException
@@ -49,7 +50,8 @@ esi = ESIClientProvider(
 
 def to_plain(value):
     """Recursively convert Pydantic models returned by the OpenAPI client to plain Python types."""
-    from datetime import datetime, date
+    # Standard Library
+    from datetime import date, datetime
 
     if hasattr(value, "model_dump"):
         return to_plain(value.model_dump())
@@ -81,11 +83,7 @@ def parse_expires(headers: dict | None):
     return dt.astimezone(timezone.utc)
 
 
-def _call_esi_operation(
-    operation,
-    use_results: bool = False,
-    **kwargs
-) -> Tuple[Any, Optional[datetime]]:
+def _call_esi_operation(operation, use_results: bool = False, **kwargs) -> tuple[Any, datetime | None]:
     """
     Internal helper to execute ESI operations with retry logic.
 
@@ -136,12 +134,12 @@ def _call_esi_operation(
         raise
 
 
-def call_result(operation, **kwargs) -> Tuple[Any, Optional[datetime]]:
+def call_result(operation, **kwargs) -> tuple[Any, datetime | None]:
     """Execute an OpenAPI operation.result() call and return (data, expires_at)."""
     return _call_esi_operation(operation, use_results=False, **kwargs)
 
 
-def call_results(operation, **kwargs) -> Tuple[Any, Optional[datetime]]:
+def call_results(operation, **kwargs) -> tuple[Any, datetime | None]:
     """Execute operation.results() and return (list_data, expires_at) with plain types."""
     return _call_esi_operation(operation, use_results=True, **kwargs)
 
@@ -227,10 +225,7 @@ def _maybe_backoff_on_rate_limit(headers: dict | None, threshold: int) -> None:
         wait_seconds = window_seconds or 60
 
     logger.warning(
-        "ESI rate limit remaining low for %s: %s. Backing off for %ss.",
-        group or "unknown",
-        remaining,
-        wait_seconds
+        "ESI rate limit remaining low for %s: %s. Backing off for %ss.", group or "unknown", remaining, wait_seconds
     )
     time.sleep(wait_seconds)
 

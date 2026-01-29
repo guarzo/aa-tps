@@ -1,9 +1,11 @@
 """Tests for aatps.utils module."""
 
-from datetime import datetime, timezone as dt_timezone
+# Standard Library
+from datetime import datetime
 from decimal import Decimal
 from unittest import TestCase
 
+# AA Campaign
 from aatps.utils import safe_int
 
 # Note: format_isk, get_current_month_range, and get_month_range are tested

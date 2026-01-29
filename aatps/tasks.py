@@ -3,9 +3,10 @@
 # Standard Library
 import logging
 import time
-from calendar import monthrange
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 
+# Third Party
 # Third-party
 import requests
 from celery import shared_task
@@ -22,6 +23,7 @@ from django.utils import timezone
 from allianceauth.authentication.models import CharacterOwnership
 from allianceauth.eveonline.models import EveCharacter
 
+# Alliance Auth (External Libs)
 # Eve Universe
 from eveuniverse.models import EveSolarSystem, EveType
 
@@ -49,23 +51,20 @@ TASK_LOCK_TIMEOUT = 7200  # Cache lock timeout in seconds
 # Data Collection Helpers
 # =============================================================================
 
+
 def get_all_auth_characters():
     """
     Return all characters owned by authenticated users.
     Returns a queryset of EveCharacter objects with their user relationships.
     """
-    return EveCharacter.objects.filter(
-        character_ownership__isnull=False
-    ).select_related('character_ownership__user')
+    return EveCharacter.objects.filter(character_ownership__isnull=False).select_related("character_ownership__user")
 
 
 def get_auth_character_ids():
     """
     Return a set of all character IDs owned by authenticated users.
     """
-    return set(
-        CharacterOwnership.objects.values_list('character__character_id', flat=True)
-    )
+    return set(CharacterOwnership.objects.values_list("character__character_id", flat=True))
 
 
 def get_user_for_character(character_id):
@@ -73,9 +72,7 @@ def get_user_for_character(character_id):
     Get the User associated with a character_id, or None if not found.
     """
     try:
-        ownership = CharacterOwnership.objects.select_related('user').get(
-            character__character_id=character_id
-        )
+        ownership = CharacterOwnership.objects.select_related("user").get(character__character_id=character_id)
         return ownership.user
     except CharacterOwnership.DoesNotExist:
         return None
@@ -83,12 +80,8 @@ def get_user_for_character(character_id):
 
 # Reusable session for zKillboard calls
 _zkill_session = requests.Session()
-_zkill_retries = Retry(
-    total=3,
-    backoff_factor=2,
-    status_forcelist=[429, 500, 502, 503, 504]
-)
-_zkill_session.mount('https://', HTTPAdapter(max_retries=_zkill_retries))
+_zkill_retries = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+_zkill_session.mount("https://", HTTPAdapter(max_retries=_zkill_retries))
 
 _last_zkill_call = 0
 
@@ -105,10 +98,10 @@ def _zkill_get(url):
         sleep_time = ZKILL_MIN_REQUEST_INTERVAL - elapsed
         time.sleep(sleep_time)
 
-    contact_email = getattr(settings, 'ESI_USER_CONTACT_EMAIL', 'Unknown')
+    contact_email = getattr(settings, "ESI_USER_CONTACT_EMAIL", "Unknown")
     headers = {
-        'User-Agent': f'Alliance Auth TPS Plugin - Maintainer: {contact_email}',
-        'Accept-Encoding': 'gzip',
+        "User-Agent": f"Alliance Auth TPS Plugin - Maintainer: {contact_email}",
+        "Accept-Encoding": "gzip",
     }
 
     logger.debug(f"Fetching from zKillboard: {url}")
@@ -120,10 +113,7 @@ def _zkill_get(url):
 def _fetch_universe_names(ids):
     """Fetch entity names from ESI."""
     try:
-        data, _ = call_result(
-            lambda: esi.client.Universe.PostUniverseNames,
-            body=ids
-        )
+        data, _ = call_result(lambda: esi.client.Universe.PostUniverseNames, body=ids)
         return data
     except Exception as e:
         logger.warning(f"Failed to fetch universe names for {ids}: {e}")
@@ -165,7 +155,7 @@ def fetch_killmail_from_esi(killmail_id, killmail_hash):
         data, _ = call_result(
             lambda: esi.client.Killmails.GetKillmailsKillmailIdKillmailHash,
             killmail_id=killmail_id,
-            killmail_hash=killmail_hash
+            killmail_hash=killmail_hash,
         )
         return data
     except Exception as e:
@@ -175,10 +165,10 @@ def fetch_killmail_from_esi(killmail_id, killmail_hash):
 
 def get_killmail_time(km_data):
     """Extract killmail time from km_data, handling various formats."""
-    km_time_str = km_data.get('killmail_time')
+    km_time_str = km_data.get("killmail_time")
     if km_time_str:
         try:
-            km_time = timezone.datetime.fromisoformat(km_time_str.replace('Z', '+00:00'))
+            km_time = timezone.datetime.fromisoformat(km_time_str.replace("Z", "+00:00"))
             if timezone.is_naive(km_time):
                 km_time = timezone.make_aware(km_time)
             return km_time
@@ -186,15 +176,15 @@ def get_killmail_time(km_data):
             logger.debug(f"Failed to parse killmail_time '{km_time_str}': {e}")
 
     # Try ESI if we have ID and Hash
-    km_id = km_data.get('killmail_id')
-    km_hash = km_data.get('zkb', {}).get('hash')
+    km_id = km_data.get("killmail_id")
+    km_hash = km_data.get("zkb", {}).get("hash")
     if km_id and km_hash:
         esi_data = fetch_killmail_from_esi(km_id, km_hash)
         if esi_data:
-            km_time_str = esi_data.get('killmail_time')
+            km_time_str = esi_data.get("killmail_time")
             if km_time_str:
                 try:
-                    km_time = timezone.datetime.fromisoformat(km_time_str.replace('Z', '+00:00'))
+                    km_time = timezone.datetime.fromisoformat(km_time_str.replace("Z", "+00:00"))
                     if timezone.is_naive(km_time):
                         km_time = timezone.make_aware(km_time)
                     return km_time
@@ -206,6 +196,7 @@ def get_killmail_time(km_data):
 # =============================================================================
 # Monthly Killmail Data Collection
 # =============================================================================
+
 
 @shared_task(time_limit=TASK_MAX_RUNTIME_SECONDS)
 def pull_monthly_killmails():
@@ -278,17 +269,17 @@ def _pull_monthly_killmails_logic():
 
     # Pre-fetch character-to-user mapping to avoid N+1 queries
     char_user_map = {}
-    for ownership in CharacterOwnership.objects.select_related('user', 'character'):
+    for ownership in CharacterOwnership.objects.select_related("user", "character"):
         char_user_map[ownership.character.character_id] = ownership.user
 
     # Local caches
     context = {
-        'resolved_names': {},
-        'resolved_characters': {},
-        'resolved_systems': {},
-        'resolved_types': {},
-        'auth_char_ids': auth_char_ids,
-        'char_user_map': char_user_map,
+        "resolved_names": {},
+        "resolved_characters": {},
+        "resolved_systems": {},
+        "resolved_types": {},
+        "auth_char_ids": auth_char_ids,
+        "char_user_map": char_user_map,
     }
 
     processed_km_ids = set()
@@ -301,7 +292,7 @@ def _pull_monthly_killmails_logic():
         new_participants = 0
 
         for km_data in kms:
-            km_id = km_data.get('killmail_id')
+            km_id = km_data.get("killmail_id")
             if not km_id or km_id in processed_km_ids:
                 continue
 
@@ -311,7 +302,7 @@ def _pull_monthly_killmails_logic():
             result = process_monthly_killmail(km_data, context, month_start)
             if result:
                 new_kms += 1
-                new_participants += result.get('participants', 0)
+                new_participants += result.get("participants", 0)
 
         total_killmails += new_kms
         total_participants += new_participants
@@ -326,10 +317,12 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Alliance {i}/{len(alliances_to_pull)}] Pulling alliance {alliance_id}")
-        _pull_entity_killmails('allianceID', alliance_id, year, month, month_start, process_page)
+        _pull_entity_killmails("allianceID", alliance_id, year, month, month_start, process_page)
 
     if alliances_to_pull:
-        logger.info(f"Alliance pulls complete. Running total: {total_killmails} killmails, {total_participants} participants")
+        logger.info(
+            f"Alliance pulls complete. Running total: {total_killmails} killmails, {total_participants} participants"
+        )
 
     # Pull corps not covered by alliances
     if corps_to_pull:
@@ -340,10 +333,12 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Corp {i}/{len(corps_to_pull)}] Pulling corporation {corp_id}")
-        _pull_entity_killmails('corporationID', corp_id, year, month, month_start, process_page)
+        _pull_entity_killmails("corporationID", corp_id, year, month, month_start, process_page)
 
     if corps_to_pull:
-        logger.info(f"Corporation pulls complete. Running total: {total_killmails} killmails, {total_participants} participants")
+        logger.info(
+            f"Corporation pulls complete. Running total: {total_killmails} killmails, {total_participants} participants"
+        )
 
     # Pull solo characters
     if solo_characters:
@@ -354,7 +349,7 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Char {i}/{len(solo_characters)}] Pulling character {char_id}")
-        _pull_entity_killmails('characterID', char_id, year, month, month_start, process_page)
+        _pull_entity_killmails("characterID", char_id, year, month, month_start, process_page)
 
     elapsed = time.time() - start_time
     logger.info(
@@ -406,15 +401,15 @@ def process_monthly_killmail(km_data, context, month_start):
 
     Returns dict with 'participants' count if processed, None if skipped.
     """
-    km_id = km_data.get('killmail_id')
+    km_id = km_data.get("killmail_id")
     if not km_id:
         return None
 
     # Need full data - fetch from ESI FIRST if necessary
     # zkillboard only returns killmail_id and zkb block, not victim/attackers
-    needs_esi = any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers'])
+    needs_esi = any(k not in km_data for k in ["killmail_time", "solar_system_id", "victim", "attackers"])
     if needs_esi:
-        km_hash = km_data.get('zkb', {}).get('hash')
+        km_hash = km_data.get("zkb", {}).get("hash")
         if km_hash:
             esi_data = fetch_killmail_from_esi(km_id, km_hash)
             if esi_data:
@@ -426,46 +421,50 @@ def process_monthly_killmail(km_data, context, month_start):
             logger.warning(f"Killmail {km_id} missing hash for ESI fetch")
             return None
 
-    auth_char_ids = context.get('auth_char_ids', set())
+    auth_char_ids = context.get("auth_char_ids", set())
 
     # Check if any auth user is involved (as attacker or victim)
     # Now we have full data from ESI
     involved_auth_chars = []
-    victim = km_data.get('victim', {})
-    victim_char_id = victim.get('character_id')
+    victim = km_data.get("victim", {})
+    victim_char_id = victim.get("character_id")
 
     # Check victim
     victim_is_auth = victim_char_id and victim_char_id in auth_char_ids
 
     # Check attackers
-    for attacker in km_data.get('attackers', []):
-        char_id = attacker.get('character_id')
+    for attacker in km_data.get("attackers", []):
+        char_id = attacker.get("character_id")
         if char_id and char_id in auth_char_ids:
-            involved_auth_chars.append({
-                'character_id': char_id,
-                'is_victim': False,
-                'is_final_blow': attacker.get('final_blow', False),
-                'damage_done': attacker.get('damage_done', 0),
-                'ship_type_id': attacker.get('ship_type_id', 0),
-            })
+            involved_auth_chars.append(
+                {
+                    "character_id": char_id,
+                    "is_victim": False,
+                    "is_final_blow": attacker.get("final_blow", False),
+                    "damage_done": attacker.get("damage_done", 0),
+                    "ship_type_id": attacker.get("ship_type_id", 0),
+                }
+            )
 
     # Add victim if they're an auth user
     if victim_is_auth:
-        involved_auth_chars.append({
-            'character_id': victim_char_id,
-            'is_victim': True,
-            'is_final_blow': False,
-            'damage_done': 0,
-            'ship_type_id': victim.get('ship_type_id', 0),
-        })
+        involved_auth_chars.append(
+            {
+                "character_id": victim_char_id,
+                "is_victim": True,
+                "is_final_blow": False,
+                "damage_done": 0,
+                "ship_type_id": victim.get("ship_type_id", 0),
+            }
+        )
 
     if not involved_auth_chars:
         return None
 
     # Parse time
     try:
-        km_time_str = km_data.get('killmail_time', '')
-        km_time = timezone.datetime.fromisoformat(km_time_str.replace('Z', '+00:00'))
+        km_time_str = km_data.get("killmail_time", "")
+        km_time = timezone.datetime.fromisoformat(km_time_str.replace("Z", "+00:00"))
         if timezone.is_naive(km_time):
             km_time = timezone.make_aware(km_time)
     except (ValueError, TypeError) as e:
@@ -477,18 +476,18 @@ def process_monthly_killmail(km_data, context, month_start):
         return None
 
     # Resolve names and system info
-    victim = km_data.get('victim', {})
-    ship_type_id = victim.get('ship_type_id', 0)
+    victim = km_data.get("victim", {})
+    ship_type_id = victim.get("ship_type_id", 0)
     ship_type_name = "Unknown"
     ship_group_name = "Unknown"
 
     if ship_type_id:
         ship_type_name = _resolve_name(ship_type_id, context)
         try:
-            s_type = context.get('resolved_types', {}).get(ship_type_id)
+            s_type = context.get("resolved_types", {}).get(ship_type_id)
             if not s_type:
                 s_type, _ = EveType.objects.get_or_create_esi(id=ship_type_id)
-                context.setdefault('resolved_types', {})[ship_type_id] = s_type
+                context.setdefault("resolved_types", {})[ship_type_id] = s_type
             if s_type:
                 if ship_type_name == "Unknown":
                     ship_type_name = getattr(s_type, "name", ship_type_name)
@@ -498,19 +497,17 @@ def process_monthly_killmail(km_data, context, month_start):
             logger.warning(f"Failed to get ship group for {ship_type_id}: {e}")
 
     # Get system info
-    system_id = km_data.get('solar_system_id', 0)
+    system_id = km_data.get("solar_system_id", 0)
     system_name = "Unknown"
     region_id = None
     region_name = "Unknown"
 
     if system_id:
-        system = context.get('resolved_systems', {}).get(system_id)
+        system = context.get("resolved_systems", {}).get(system_id)
         if not system:
             try:
-                system = EveSolarSystem.objects.select_related(
-                    'eve_constellation__eve_region'
-                ).get(id=system_id)
-                context.setdefault('resolved_systems', {})[system_id] = system
+                system = EveSolarSystem.objects.select_related("eve_constellation__eve_region").get(id=system_id)
+                context.setdefault("resolved_systems", {})[system_id] = system
             except EveSolarSystem.DoesNotExist:
                 system = None
 
@@ -521,45 +518,51 @@ def process_monthly_killmail(km_data, context, month_start):
                 region_name = system.eve_constellation.eve_region.name
 
     # Resolve final blow attacker
-    final_blow_attacker = next((a for a in km_data.get('attackers', []) if a.get('final_blow')), {})
+    final_blow_attacker = next((a for a in km_data.get("attackers", []) if a.get("final_blow")), {})
 
     # Create or update the MonthlyKillmail
     with transaction.atomic():
         monthly_km, created = MonthlyKillmail.objects.update_or_create(
             killmail_id=km_id,
             defaults={
-                'killmail_time': km_time,
-                'solar_system_id': system_id,
-                'solar_system_name': system_name,
-                'region_id': region_id,
-                'region_name': region_name,
-                'ship_type_id': ship_type_id,
-                'ship_type_name': ship_type_name,
-                'ship_group_name': ship_group_name,
-                'victim_id': victim.get('character_id', 0) or 0,
-                'victim_name': _resolve_name(victim.get('character_id'), context) or "Unknown",
-                'victim_corp_id': victim.get('corporation_id', 0) or 0,
-                'victim_corp_name': _resolve_name(victim.get('corporation_id'), context) or "Unknown",
-                'victim_alliance_id': victim.get('alliance_id'),
-                'victim_alliance_name': _resolve_name(victim.get('alliance_id'), context) if victim.get('alliance_id') else None,
-                'final_blow_char_id': final_blow_attacker.get('character_id', 0) or 0,
-                'final_blow_char_name': _resolve_name(final_blow_attacker.get('character_id'), context) or "Unknown",
-                'final_blow_corp_id': final_blow_attacker.get('corporation_id', 0) or 0,
-                'final_blow_corp_name': _resolve_name(final_blow_attacker.get('corporation_id'), context) or "Unknown",
-                'final_blow_alliance_id': final_blow_attacker.get('alliance_id'),
-                'final_blow_alliance_name': _resolve_name(final_blow_attacker.get('alliance_id'), context) if final_blow_attacker.get('alliance_id') else None,
-                'total_value': km_data.get('zkb', {}).get('totalValue', 0),
-                'zkill_hash': km_data.get('zkb', {}).get('hash', ''),
-            }
+                "killmail_time": km_time,
+                "solar_system_id": system_id,
+                "solar_system_name": system_name,
+                "region_id": region_id,
+                "region_name": region_name,
+                "ship_type_id": ship_type_id,
+                "ship_type_name": ship_type_name,
+                "ship_group_name": ship_group_name,
+                "victim_id": victim.get("character_id", 0) or 0,
+                "victim_name": _resolve_name(victim.get("character_id"), context) or "Unknown",
+                "victim_corp_id": victim.get("corporation_id", 0) or 0,
+                "victim_corp_name": _resolve_name(victim.get("corporation_id"), context) or "Unknown",
+                "victim_alliance_id": victim.get("alliance_id"),
+                "victim_alliance_name": (
+                    _resolve_name(victim.get("alliance_id"), context) if victim.get("alliance_id") else None
+                ),
+                "final_blow_char_id": final_blow_attacker.get("character_id", 0) or 0,
+                "final_blow_char_name": _resolve_name(final_blow_attacker.get("character_id"), context) or "Unknown",
+                "final_blow_corp_id": final_blow_attacker.get("corporation_id", 0) or 0,
+                "final_blow_corp_name": _resolve_name(final_blow_attacker.get("corporation_id"), context) or "Unknown",
+                "final_blow_alliance_id": final_blow_attacker.get("alliance_id"),
+                "final_blow_alliance_name": (
+                    _resolve_name(final_blow_attacker.get("alliance_id"), context)
+                    if final_blow_attacker.get("alliance_id")
+                    else None
+                ),
+                "total_value": km_data.get("zkb", {}).get("totalValue", 0),
+                "zkill_hash": km_data.get("zkb", {}).get("hash", ""),
+            },
         )
 
         # Create participant records
         participants_created = 0
         for participant_data in involved_auth_chars:
-            char_id = participant_data['character_id']
+            char_id = participant_data["character_id"]
 
             # Get character object
-            char = context.get('resolved_characters', {}).get(char_id)
+            char = context.get("resolved_characters", {}).get(char_id)
             if not char:
                 try:
                     char = EveCharacter.objects.get(character_id=char_id)
@@ -569,13 +572,13 @@ def process_monthly_killmail(km_data, context, month_start):
                     except Exception as e:
                         logger.warning(f"Failed to create EveCharacter for {char_id}: {e}")
                         continue
-                context.setdefault('resolved_characters', {})[char_id] = char
+                context.setdefault("resolved_characters", {})[char_id] = char
 
             # Get user for character (use pre-fetched map from context)
-            user = context.get('char_user_map', {}).get(char_id)
+            user = context.get("char_user_map", {}).get(char_id)
 
             # Resolve ship name for participant
-            participant_ship_id = participant_data.get('ship_type_id', 0)
+            participant_ship_id = participant_data.get("ship_type_id", 0)
             participant_ship_name = "Unknown"
             if participant_ship_id:
                 participant_ship_name = _resolve_name(participant_ship_id, context) or "Unknown"
@@ -585,13 +588,13 @@ def process_monthly_killmail(km_data, context, month_start):
                 killmail=monthly_km,
                 character=char,
                 defaults={
-                    'user': user,
-                    'is_victim': participant_data['is_victim'],
-                    'is_final_blow': participant_data['is_final_blow'],
-                    'damage_done': participant_data['damage_done'],
-                    'ship_type_id': participant_ship_id,
-                    'ship_type_name': participant_ship_name,
-                }
+                    "user": user,
+                    "is_victim": participant_data["is_victim"],
+                    "is_final_blow": participant_data["is_final_blow"],
+                    "damage_done": participant_data["damage_done"],
+                    "ship_type_id": participant_ship_id,
+                    "ship_type_name": participant_ship_name,
+                },
             )
             if p_created:
                 participants_created += 1
@@ -599,7 +602,7 @@ def process_monthly_killmail(km_data, context, month_start):
     action = "Created" if created else "Updated"
     logger.debug(f"{action} MonthlyKillmail {km_id} with {participants_created} new participants")
 
-    return {'participants': participants_created}
+    return {"participants": participants_created}
 
 
 def _resolve_name(entity_id, context):
@@ -608,15 +611,15 @@ def _resolve_name(entity_id, context):
         return None
 
     # Check cache first
-    cached = context.get('resolved_names', {}).get(entity_id)
+    cached = context.get("resolved_names", {}).get(entity_id)
     if cached:
         return cached
 
     # Fetch from ESI
     data = _fetch_universe_names([entity_id])
     if data:
-        name = data[0].get('name', 'Unknown')
-        context.setdefault('resolved_names', {})[entity_id] = name
+        name = data[0].get("name", "Unknown")
+        context.setdefault("resolved_names", {})[entity_id] = name
         return name
 
     return "Unknown"
@@ -631,15 +634,17 @@ def cleanup_old_killmails():
     The retention period is configured via AA_TPS_RETENTION_MONTHS setting.
     Default is 12 months.
     """
+    # Standard Library
     from datetime import timedelta
+
     from .app_settings import AA_TPS_RETENTION_MONTHS
 
     cutoff = datetime.now(dt_timezone.utc) - timedelta(days=AA_TPS_RETENTION_MONTHS * 30)
 
-    deleted_count, _ = MonthlyKillmail.objects.filter(
-        killmail_time__lt=cutoff
-    ).delete()
+    deleted_count, _ = MonthlyKillmail.objects.filter(killmail_time__lt=cutoff).delete()
 
-    logger.info(f"Cleaned up {deleted_count} MonthlyKillmail records older than {cutoff} "
-                f"(retention: {AA_TPS_RETENTION_MONTHS} months)")
+    logger.info(
+        f"Cleaned up {deleted_count} MonthlyKillmail records older than {cutoff} "
+        f"(retention: {AA_TPS_RETENTION_MONTHS} months)"
+    )
     return f"Deleted {deleted_count} old killmails"

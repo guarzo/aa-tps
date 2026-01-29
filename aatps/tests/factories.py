@@ -1,12 +1,17 @@
 """Test factories for AA TPS models."""
 
-from datetime import datetime, timezone as dt_timezone
+# Standard Library
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from decimal import Decimal
 
+# Django
 from django.contrib.auth import get_user_model
 
+# Alliance Auth
 from allianceauth.eveonline.models import EveCharacter
 
+# AA Campaign
 from aatps.models import KillmailParticipant, MonthlyKillmail
 
 User = get_user_model()
@@ -36,7 +41,7 @@ class MonthlyKillmailFactory:
         victim_alliance_id: int = None,
         victim_alliance_name: str = None,
         total_value: Decimal = Decimal("1000000.00"),
-        **kwargs
+        **kwargs,
     ) -> MonthlyKillmail:
         """Create a MonthlyKillmail instance."""
         cls._counter += 1
@@ -64,7 +69,7 @@ class MonthlyKillmailFactory:
             victim_alliance_id=victim_alliance_id,
             victim_alliance_name=victim_alliance_name,
             total_value=total_value,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod

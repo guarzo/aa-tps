@@ -1,12 +1,14 @@
 """Shared utilities for AA TPS."""
 
+# Standard Library
 from calendar import monthrange
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from decimal import Decimal
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Union
 
 
-def get_current_month_range() -> Tuple[datetime, datetime]:
+def get_current_month_range() -> tuple[datetime, datetime]:
     """
     Return (start_datetime, end_datetime) for current month in UTC.
 
@@ -22,7 +24,7 @@ def get_current_month_range() -> Tuple[datetime, datetime]:
     return start, end
 
 
-def get_month_range(year: int, month: int) -> Tuple[datetime, datetime]:
+def get_month_range(year: int, month: int) -> tuple[datetime, datetime]:
     """
     Return (start_datetime, end_datetime) for a specific month in UTC.
 
@@ -44,7 +46,7 @@ def get_month_range(year: int, month: int) -> Tuple[datetime, datetime]:
     return start, end
 
 
-def format_isk(value: Optional[Union[Decimal, float, int]]) -> str:
+def format_isk(value: Union[Decimal, float, int] | None) -> str:
     """
     Format ISK value for display with appropriate suffix.
 
@@ -76,7 +78,7 @@ def format_isk(value: Optional[Union[Decimal, float, int]]) -> str:
     return f"{value:.0f}"
 
 
-def safe_int(value: Any, default: int, min_val: int = 0, max_val: Optional[int] = None) -> int:
+def safe_int(value: Any, default: int, min_val: int = 0, max_val: int | None = None) -> int:
     """
     Safely parse an integer from user input with bounds checking.
 

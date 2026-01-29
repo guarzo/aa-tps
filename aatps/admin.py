@@ -6,10 +6,12 @@ The admin is intentionally read-only to prevent accidental data corruption -
 all data is pulled automatically from zKillboard.
 """
 
+# Django
 from django.contrib import admin
+
 from .models import (
-    MonthlyKillmail,
     KillmailParticipant,
+    MonthlyKillmail,
 )
 from .utils import format_isk
 
@@ -40,32 +42,32 @@ class MonthlyKillmailAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     """Read-only admin interface for viewing killmail data."""
 
     list_display = (
-        'killmail_id',
-        'killmail_time',
-        'ship_type_name',
-        'victim_name',
-        'victim_corp_name',
-        'solar_system_name',
-        'formatted_value',
+        "killmail_id",
+        "killmail_time",
+        "ship_type_name",
+        "victim_name",
+        "victim_corp_name",
+        "solar_system_name",
+        "formatted_value",
     )
     list_filter = (
-        'killmail_time',
-        'ship_group_name',
-        'region_name',
+        "killmail_time",
+        "ship_group_name",
+        "region_name",
     )
     search_fields = (
-        'killmail_id',
-        'victim_name',
-        'victim_corp_name',
-        'victim_alliance_name',
-        'ship_type_name',
-        'solar_system_name',
-        'final_blow_char_name',
+        "killmail_id",
+        "victim_name",
+        "victim_corp_name",
+        "victim_alliance_name",
+        "ship_type_name",
+        "solar_system_name",
+        "final_blow_char_name",
     )
-    date_hierarchy = 'killmail_time'
-    ordering = ('-killmail_time',)
+    date_hierarchy = "killmail_time"
+    ordering = ("-killmail_time",)
 
-    @admin.display(description='Value (ISK)')
+    @admin.display(description="Value (ISK)")
     def formatted_value(self, obj):
         """Format the total value with ISK suffix."""
         return format_isk(obj.total_value)
@@ -76,24 +78,24 @@ class KillmailParticipantAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     """Read-only admin interface for viewing killmail participants."""
 
     list_display = (
-        'killmail',
-        'character',
-        'user',
-        'is_victim',
-        'is_final_blow',
-        'damage_done',
-        'ship_type_name',
+        "killmail",
+        "character",
+        "user",
+        "is_victim",
+        "is_final_blow",
+        "damage_done",
+        "ship_type_name",
     )
     list_filter = (
-        'is_victim',
-        'is_final_blow',
-        'killmail__killmail_time',
+        "is_victim",
+        "is_final_blow",
+        "killmail__killmail_time",
     )
     search_fields = (
-        'character__character_name',
-        'user__username',
-        'ship_type_name',
-        'killmail__killmail_id',
+        "character__character_name",
+        "user__username",
+        "ship_type_name",
+        "killmail__killmail_id",
     )
-    raw_id_fields = ('killmail', 'character', 'user')
-    ordering = ('-killmail__killmail_time',)
+    raw_id_fields = ("killmail", "character", "user")
+    ordering = ("-killmail__killmail_time",)

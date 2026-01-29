@@ -11,8 +11,8 @@ readme = "README.md"
 keywords = [
     "allianceauth",
     "killboard",
-    "statistics",
     "pvp",
+    "statistics",
     "zkillboard",
 ]
 license = { file = "LICENSE" }
@@ -56,11 +56,11 @@ include = [
 
 [tool.black]
 line-length = 120
-target-version = ["py310"]
+target-version = [ "py310" ]
 
 [tool.isort]
 profile = "black"
 line_length = 120
-known_first_party = ["aatps"]
-known_django = ["django"]
-sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+known_first_party = [ "aatps" ]
+known_django = [ "django" ]
+sections = [ "FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER" ]

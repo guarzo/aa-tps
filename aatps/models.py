@@ -42,6 +42,7 @@ class MonthlyKillmail(models.Model):
         total_value: ISK value of the killmail from zKillboard
         zkill_hash: Hash for ESI killmail lookups
     """
+
     killmail_id = models.PositiveBigIntegerField(unique=True, primary_key=True)
     killmail_time = models.DateTimeField(db_index=True)
     solar_system_id = models.PositiveIntegerField()
@@ -78,11 +79,9 @@ class MonthlyKillmail(models.Model):
 
     class Meta:
         default_permissions = ()
-        permissions = (
-            ("basic_access", "Can access this app"),
-        )
+        permissions = (("basic_access", "Can access this app"),)
         indexes = [
-            models.Index(fields=['killmail_time', 'total_value'], name='aatps_km_time_value_idx'),
+            models.Index(fields=["killmail_time", "total_value"], name="aatps_km_time_value_idx"),
         ]
 
     def __str__(self):
@@ -107,20 +106,10 @@ class KillmailParticipant(models.Model):
         ship_type_id: EVE type ID of the ship used
         ship_type_name: Name of the ship used
     """
-    killmail = models.ForeignKey(
-        MonthlyKillmail,
-        on_delete=models.CASCADE,
-        related_name='participants'
-    )
-    character = models.ForeignKey(
-        'eveonline.EveCharacter',
-        on_delete=models.CASCADE
-    )
-    user = models.ForeignKey(
-        'authentication.User',
-        on_delete=models.CASCADE,
-        null=True
-    )
+
+    killmail = models.ForeignKey(MonthlyKillmail, on_delete=models.CASCADE, related_name="participants")
+    character = models.ForeignKey("eveonline.EveCharacter", on_delete=models.CASCADE)
+    user = models.ForeignKey("authentication.User", on_delete=models.CASCADE, null=True)
     is_victim = models.BooleanField(default=False)
     is_final_blow = models.BooleanField(default=False)
     damage_done = models.PositiveIntegerField(default=0)
@@ -128,16 +117,11 @@ class KillmailParticipant(models.Model):
     ship_type_name = models.CharField(max_length=255, default="Unknown")
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['killmail', 'character'],
-                name='unique_killmail_participant'
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["killmail", "character"], name="unique_killmail_participant")]
         indexes = [
-            models.Index(fields=['is_victim'], name='aatps_parti_is_vict_idx'),
-            models.Index(fields=['is_final_blow'], name='aatps_parti_final_blow_idx'),
-            models.Index(fields=['user', 'is_victim'], name='aatps_parti_user_victim_idx'),
+            models.Index(fields=["is_victim"], name="aatps_parti_is_vict_idx"),
+            models.Index(fields=["is_final_blow"], name="aatps_parti_final_blow_idx"),
+            models.Index(fields=["user", "is_victim"], name="aatps_parti_user_victim_idx"),
         ]
 
     def __str__(self):

@@ -1,3 +1,4 @@
+# Django
 from django.db import migrations, models
 
 
@@ -10,19 +11,16 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ('aatps', '0009_add_performance_indexes'),
+        ("aatps", "0009_add_performance_indexes"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='killmailparticipant',
+            name="killmailparticipant",
             unique_together=set(),
         ),
         migrations.AddConstraint(
-            model_name='killmailparticipant',
-            constraint=models.UniqueConstraint(
-                fields=['killmail', 'character'],
-                name='unique_killmail_participant'
-            ),
+            model_name="killmailparticipant",
+            constraint=models.UniqueConstraint(fields=["killmail", "character"], name="unique_killmail_participant"),
         ),
     ]

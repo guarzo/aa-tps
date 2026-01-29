@@ -13,24 +13,28 @@ AA-TPS automatically tracks and visualizes PvP activity for all authenticated us
 ## Features
 
 ### Automatic Tracking
+
 - **All Users, All the Time** - Automatically tracks every authenticated user's PvP activity
 - **Current Month Focus** - Always shows the current month's statistics
 - **Smart Data Collection** - Intelligently pulls data by alliance/corp to minimize API calls
 - **Historical Access** - Browse previous months' statistics
 
 ### Rich Visualizations
+
 - **Daily Activity Charts** - See kills and losses over time with interactive Chart.js graphs
 - **Ship Class Breakdown** - Doughnut charts showing what's being flown and destroyed
 - **ISK Flow Analysis** - Track ISK destroyed vs lost with area charts
 - **Personal Performance** - Individual pilots can see their own stats and ranking
 
 ### Leaderboards
+
 - **Organization-wide Rankings** - See who's contributing the most
 - **Kill Count & ISK Value** - Multiple ranking metrics
 - **Top Performer Badges** - Recognition for top 5 pilots
 - **Smart Aggregation** - Alt characters properly grouped under main
 
 ### Activity Feed
+
 - **Recent Kills** - Live feed of recent activity
 - **Color-coded** - Green for kills, red for losses
 - **Direct Links** - One-click access to ZKillboard for details
@@ -49,35 +53,40 @@ AA-TPS automatically tracks and visualizes PvP activity for all authenticated us
 ## Installation
 
 1. **Activate your virtual environment:**
-  ```bash
-  source /home/allianceserver/venv/auth/bin/activate
-  cd /home/allianceserver/myauth/
-  ```
+
+```bash
+source /home/allianceserver/venv/auth/bin/activate
+cd /home/allianceserver/myauth/
+```
 
 2. **Install the package:**
-  ```bash
-  pip install aa-tps
-  ```
+
+```bash
+pip install aa-tps
+```
 
 3. **Add to INSTALLED_APPS** in your `local.py`:
-  ```python
-  INSTALLED_APPS += [
-      'eveuniverse',  # if not already added
-      'aatps',
-  ]
-  ```
+
+```python
+INSTALLED_APPS += [
+    "eveuniverse",  # if not already added
+    "aatps",
+]
+```
 
 4. **Run migrations and setup:**
-  ```bash
-  python manage.py migrate
-  python manage.py collectstatic --noinput
-  python manage.py aa_tps_setup
-  ```
+
+```bash
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py aa_tps_setup
+```
 
 5. **Restart services:**
-  ```bash
-  sudo supervisorctl restart myauth:
-  ```
+
+```bash
+sudo supervisorctl restart myauth:
+```
 
 ## Configuration
 
@@ -96,6 +105,7 @@ AA_TPS_SHOW_PERSONAL_STATS = True
 ### Automatic Data Collection
 
 AA-TPS automatically pulls killmail data hourly for all authenticated users. The task intelligently:
+
 - Groups characters by alliance/corporation to minimize API calls
 - Deduplicates data to avoid redundant requests
 - Respects ZKillboard rate limits
@@ -115,18 +125,19 @@ python manage.py aa_tps_pull --verbose
 ### Viewing Statistics
 
 1. Grant users the `aatps.basic_access` permission
-2. Users can access the dashboard from the sidebar menu
-3. The dashboard shows:
-  - Organization-wide statistics for the current month
-  - Interactive charts and graphs
-  - Leaderboard of top performers
-  - Personal statistics (if enabled)
-  - Recent activity feed
+1. Users can access the dashboard from the sidebar menu
+1. The dashboard shows:
+
+- Organization-wide statistics for the current month
+- Interactive charts and graphs
+- Leaderboard of top performers
+- Personal statistics (if enabled)
+- Recent activity feed
 
 ## Permissions
 
-| Permission | Description |
-|------------|-------------|
+| Permission     | Description                     |
+| -------------- | ------------------------------- |
 | `basic_access` | Can view the activity dashboard |
 
 ## Data Flow
@@ -148,11 +159,11 @@ Chart.js Visualizations
 ## API Politeness
 
 AA-TPS is designed with API politeness as a priority:
+
 - Minimum 500ms between ZKillboard requests
 - Smart deduplication reduces redundant calls
 - Respects rate limit headers
 - Uses compression for faster transfers
-
 
 ## Contributing
 
