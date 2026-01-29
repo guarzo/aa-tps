@@ -336,9 +336,10 @@ def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, pro
     """
     Pull killmails for a single entity and process them.
     Uses year/month API endpoint to avoid zKillboard's pastSeconds 7-day limit.
+    zKillboard limits pages to 20 max.
     """
     page = 1
-    max_pages = 50
+    max_pages = 20
 
     while page <= max_pages:
         kms = fetch_from_zkill(entity_type, entity_id, year=year, month=month, page=page)
