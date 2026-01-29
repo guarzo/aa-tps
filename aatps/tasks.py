@@ -318,6 +318,8 @@ def _pull_monthly_killmails_logic():
         return new_kms
 
     # Pull alliances
+    if alliances_to_pull:
+        logger.info(f"Pulling {len(alliances_to_pull)} alliances...")
     for i, alliance_id in enumerate(alliances_to_pull, 1):
         if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
@@ -326,7 +328,12 @@ def _pull_monthly_killmails_logic():
         logger.info(f"[Alliance {i}/{len(alliances_to_pull)}] Pulling alliance {alliance_id}")
         _pull_entity_killmails('allianceID', alliance_id, year, month, month_start, process_page)
 
+    if alliances_to_pull:
+        logger.info(f"Alliance pulls complete. Running total: {total_killmails} killmails, {total_participants} participants")
+
     # Pull corps not covered by alliances
+    if corps_to_pull:
+        logger.info(f"Pulling {len(corps_to_pull)} corporations...")
     for i, corp_id in enumerate(corps_to_pull, 1):
         if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
@@ -335,7 +342,12 @@ def _pull_monthly_killmails_logic():
         logger.info(f"[Corp {i}/{len(corps_to_pull)}] Pulling corporation {corp_id}")
         _pull_entity_killmails('corporationID', corp_id, year, month, month_start, process_page)
 
+    if corps_to_pull:
+        logger.info(f"Corporation pulls complete. Running total: {total_killmails} killmails, {total_participants} participants")
+
     # Pull solo characters
+    if solo_characters:
+        logger.info(f"Pulling {len(solo_characters)} solo characters...")
     for i, char_id in enumerate(solo_characters, 1):
         if time.time() - start_time > TASK_MAX_RUNTIME_SECONDS:
             logger.warning("Task exceeded 2 hour limit, stopping early.")
@@ -359,14 +371,18 @@ def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, pro
     zKillboard limits pages to 20 max.
     """
     page = 1
+    total_fetched = 0
+    total_processed = 0
 
     while page <= ZKILL_MAX_PAGES:
         kms = fetch_from_zkill(entity_type, entity_id, year=year, month=month, page=page)
         if not kms:
             break
 
+        total_fetched += len(kms)
         logger.debug(f"Fetched page {page} ({len(kms)} kills) for {entity_type} {entity_id}")
         new_on_page = process_callback(kms)
+        total_processed += new_on_page
         logger.debug(f"Processed {new_on_page} new killmails from page {page}")
 
         if len(kms) < ZKILL_PAGE_SIZE:  # Last page
@@ -378,6 +394,9 @@ def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, pro
             break
 
         page += 1
+
+    if total_fetched > 0:
+        logger.info(f"  → Fetched {total_fetched} killmails, processed {total_processed} with auth users")
 
 
 def process_monthly_killmail(km_data, context, month_start):

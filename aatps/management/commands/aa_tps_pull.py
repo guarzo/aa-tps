@@ -19,27 +19,21 @@ class _AatpsPullLogFilter(logging.Filter):
 
 
 def _configure_logging(verbose):
-    if verbose:
-        logging.getLogger('aatps').setLevel(logging.DEBUG)
-        return
-
-    logging.getLogger('aatps').setLevel(logging.INFO)
+    # Always silence the noisy ESI/HTTP client loggers
     for logger_name in (
         'esi',
         'esi.aiopenapi3',
         'esi.openapi_clients',
         'httpx',
         'urllib3',
+        'requests',
     ):
-        logging.getLogger(logger_name).setLevel(logging.ERROR)
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
-    log_filter = _AatpsPullLogFilter()
-    for handler in logging.getLogger().handlers:
-        if not any(isinstance(f, _AatpsPullLogFilter) for f in handler.filters):
-            handler.addFilter(log_filter)
-    for handler in logging.getLogger('aatps').handlers:
-        if not any(isinstance(f, _AatpsPullLogFilter) for f in handler.filters):
-            handler.addFilter(log_filter)
+    if verbose:
+        logging.getLogger('aatps').setLevel(logging.DEBUG)
+    else:
+        logging.getLogger('aatps').setLevel(logging.INFO)
 
 
 class Command(BaseCommand):

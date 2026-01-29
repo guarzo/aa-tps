@@ -1,0 +1,8 @@
+{
+  "name": "aa-campaigns",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.39.1",
+    "globals": "^16.0.0"
+  }
+}
