@@ -223,9 +223,10 @@ def _pull_monthly_killmails_logic():
     # Get current month range
     month_start, month_end = get_current_month_range()
     now = datetime.now(dt_timezone.utc)
-    seconds_to_pull = int((now - month_start).total_seconds())
+    year = now.year
+    month = now.month
 
-    logger.info(f"Pulling killmails for {month_start.strftime('%B %Y')} ({seconds_to_pull}s lookback)")
+    logger.info(f"Pulling killmails for {month_start.strftime('%B %Y')}")
 
     # Get all auth characters and group them
     characters = get_all_auth_characters()
@@ -303,7 +304,7 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Alliance {i}/{len(alliances_to_pull)}] Pulling alliance {alliance_id}")
-        _pull_entity_killmails('allianceID', alliance_id, seconds_to_pull, month_start, process_page)
+        _pull_entity_killmails('allianceID', alliance_id, year, month, month_start, process_page)
 
     # Pull corps not covered by alliances
     for i, corp_id in enumerate(corps_to_pull, 1):
@@ -312,7 +313,7 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Corp {i}/{len(corps_to_pull)}] Pulling corporation {corp_id}")
-        _pull_entity_killmails('corporationID', corp_id, seconds_to_pull, month_start, process_page)
+        _pull_entity_killmails('corporationID', corp_id, year, month, month_start, process_page)
 
     # Pull solo characters
     for i, char_id in enumerate(solo_characters, 1):
@@ -321,7 +322,7 @@ def _pull_monthly_killmails_logic():
             break
 
         logger.info(f"[Char {i}/{len(solo_characters)}] Pulling character {char_id}")
-        _pull_entity_killmails('characterID', char_id, seconds_to_pull, month_start, process_page)
+        _pull_entity_killmails('characterID', char_id, year, month, month_start, process_page)
 
     elapsed = time.time() - start_time
     logger.info(
@@ -331,16 +332,16 @@ def _pull_monthly_killmails_logic():
     return f"Processed {total_killmails} killmails, {total_participants} participants"
 
 
-def _pull_entity_killmails(entity_type, entity_id, seconds_to_pull, month_start, process_callback):
+def _pull_entity_killmails(entity_type, entity_id, year, month, month_start, process_callback):
     """
     Pull killmails for a single entity and process them.
-    Uses pastSeconds API for recent data.
+    Uses year/month API endpoint to avoid zKillboard's pastSeconds 7-day limit.
     """
     page = 1
     max_pages = 50
 
     while page <= max_pages:
-        kms = fetch_from_zkill(entity_type, entity_id, past_seconds=seconds_to_pull, page=page)
+        kms = fetch_from_zkill(entity_type, entity_id, year=year, month=month, page=page)
         if not kms:
             break
 
