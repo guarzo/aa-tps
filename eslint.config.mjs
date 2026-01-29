@@ -32,6 +32,7 @@ const browserGlobals = {
     FileReader: "readonly",
     atob: "readonly",
     btoa: "readonly",
+    performance: "readonly",
     alert: "readonly",
     confirm: "readonly",
     prompt: "readonly",

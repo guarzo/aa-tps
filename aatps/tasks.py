@@ -389,8 +389,8 @@ def process_monthly_killmail(km_data, context, month_start):
                     "character_id": char_id,
                     "is_victim": False,
                     "is_final_blow": attacker.get("final_blow", False),
-                    "damage_done": attacker.get("damage_done", 0),
-                    "ship_type_id": attacker.get("ship_type_id", 0),
+                    "damage_done": attacker.get("damage_done") or 0,
+                    "ship_type_id": attacker.get("ship_type_id") or 0,
                 }
             )
 
@@ -402,7 +402,7 @@ def process_monthly_killmail(km_data, context, month_start):
                 "is_victim": True,
                 "is_final_blow": False,
                 "damage_done": 0,
-                "ship_type_id": victim.get("ship_type_id", 0),
+                "ship_type_id": victim.get("ship_type_id") or 0,
             }
         )
 
@@ -425,7 +425,7 @@ def process_monthly_killmail(km_data, context, month_start):
 
     # Resolve names and system info
     victim = km_data.get("victim", {})
-    ship_type_id = victim.get("ship_type_id", 0)
+    ship_type_id = victim.get("ship_type_id") or 0
     ship_type_name = "Unknown"
     ship_group_name = "Unknown"
 
@@ -445,7 +445,7 @@ def process_monthly_killmail(km_data, context, month_start):
             logger.warning(f"Failed to get ship group for {ship_type_id}: {e}")
 
     # Get system info
-    system_id = km_data.get("solar_system_id", 0)
+    system_id = km_data.get("solar_system_id") or 0
     system_name = "Unknown"
     region_id = None
     region_name = "Unknown"
@@ -526,7 +526,7 @@ def process_monthly_killmail(km_data, context, month_start):
             user = context.get("char_user_map", {}).get(char_id)
 
             # Resolve ship name for participant
-            participant_ship_id = participant_data.get("ship_type_id", 0)
+            participant_ship_id = participant_data.get("ship_type_id") or 0
             participant_ship_name = "Unknown"
             if participant_ship_id:
                 participant_ship_name = _resolve_name(participant_ship_id, context) or "Unknown"

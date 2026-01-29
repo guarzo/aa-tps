@@ -467,7 +467,6 @@
                     const isLoss = kill.is_loss;
                     const date = new Date(kill.killmail_time);
                     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const dateStr = date.toLocaleDateString();
 
                     html += `
                         <div class="killmail-row ${isLoss ? 'is-loss' : 'is-kill'}">
