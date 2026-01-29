@@ -391,9 +391,26 @@ def process_monthly_killmail(km_data, context, month_start):
     if not km_id:
         return None
 
+    # Need full data - fetch from ESI FIRST if necessary
+    # zkillboard only returns killmail_id and zkb block, not victim/attackers
+    needs_esi = any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers'])
+    if needs_esi:
+        km_hash = km_data.get('zkb', {}).get('hash')
+        if km_hash:
+            esi_data = fetch_killmail_from_esi(km_id, km_hash)
+            if esi_data:
+                km_data.update(esi_data)
+            else:
+                logger.warning(f"Failed to fetch killmail {km_id} from ESI")
+                return None
+        else:
+            logger.warning(f"Killmail {km_id} missing hash for ESI fetch")
+            return None
+
     auth_char_ids = context.get('auth_char_ids', set())
 
     # Check if any auth user is involved (as attacker or victim)
+    # Now we have full data from ESI
     involved_auth_chars = []
     victim = km_data.get('victim', {})
     victim_char_id = victim.get('character_id')
@@ -425,21 +442,6 @@ def process_monthly_killmail(km_data, context, month_start):
 
     if not involved_auth_chars:
         return None
-
-    # Need full data - fetch from ESI if necessary
-    needs_esi = any(k not in km_data for k in ['killmail_time', 'solar_system_id', 'victim', 'attackers'])
-    if needs_esi:
-        km_hash = km_data.get('zkb', {}).get('hash')
-        if km_hash:
-            esi_data = fetch_killmail_from_esi(km_id, km_hash)
-            if esi_data:
-                km_data.update(esi_data)
-            else:
-                logger.warning(f"Failed to fetch killmail {km_id} from ESI")
-                return None
-        else:
-            logger.warning(f"Killmail {km_id} missing hash for ESI fetch")
-            return None
 
     # Parse time
     try:
