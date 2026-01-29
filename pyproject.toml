@@ -5,12 +5,15 @@ requires = [
 ]
 
 [project]
-name = "aa-campaign"
-description = "Z-Kill Campaigns for Alliance Auth"
+name = "aa-tps"
+description = "Total Participation Statistics for Alliance Auth"
 readme = "README.md"
 keywords = [
     "allianceauth",
-    "campaign",
+    "killboard",
+    "statistics",
+    "pvp",
+    "zkillboard",
 ]
 license = { file = "LICENSE" }
 authors = [
@@ -40,13 +43,13 @@ dependencies = [
     "allianceauth>=4.3.1,<5",
     "django-eveuniverse",
 ]
-urls.Changelog = "https://github.com/BroodLK/aa-campaign/blob/master/CHANGELOG.md"
-urls.Tracker = "https://github.com/BroodLK/aa-campaign/issues"
+urls.Changelog = "https://github.com/BroodLK/aa-tps/blob/master/CHANGELOG.md"
+urls.Tracker = "https://github.com/BroodLK/aa-tps/issues"
 
 [tool.hatch.version]
-path = "aacampaign/__init__.py"
+path = "aatps/__init__.py"
 
 [tool.hatch.build]
 include = [
-    "/aacampaign",
+    "/aatps",
 ]

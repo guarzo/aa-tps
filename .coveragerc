@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = aacampaign
+source = aatps
 
 [report]
 exclude_lines =

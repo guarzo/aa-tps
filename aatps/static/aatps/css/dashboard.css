@@ -1,0 +1,403 @@
+/* AA TPS Dashboard Styles */
+
+/* Stats Cards */
+.stats-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.stats-card .card-body {
+    padding: 1.25rem;
+}
+
+.stats-card .stats-icon {
+    opacity: 0.3;
+}
+
+.stats-card .card-subtitle {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stats-card .card-title {
+    font-size: 1.75rem;
+}
+
+/* Animated counter */
+.counter {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 700;
+}
+
+/* Stats card color variations */
+.stats-card.bg-kills {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.stats-card.bg-losses {
+    background: linear-gradient(135deg, #dc3545, #e83e8c);
+}
+
+.stats-card.bg-isk-destroyed {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+}
+
+.stats-card.bg-isk-lost {
+    background: linear-gradient(135deg, #fd7e14, #dc3545);
+}
+
+.stats-card.bg-efficiency {
+    background: linear-gradient(135deg, #007bff, #17a2b8);
+}
+
+.stats-card.bg-pilots {
+    background: linear-gradient(135deg, #6f42c1, #e83e8c);
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    min-height: 300px;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+/* Kill cards */
+.kill-card {
+    border-left: 4px solid #28a745;
+    transition: all 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.02);
+    border-radius: 0 4px 4px 0;
+}
+
+.kill-card:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    transform: translateX(2px);
+}
+
+.kill-card.loss {
+    border-left-color: #dc3545;
+}
+
+.kill-card .ship-render img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.kill-card .isk-value {
+    font-weight: 600;
+    font-family: 'Roboto Mono', monospace;
+}
+
+/* Top kills scrollable list */
+.top-kills-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.top-kills-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.top-kills-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.top-kills-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.top-kills-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Leaderboard rank badges */
+.rank-badge {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.875rem;
+    color: #fff;
+}
+
+.rank-badge.rank-1 {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+.rank-badge.rank-2 {
+    background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+}
+
+.rank-badge.rank-3 {
+    background: linear-gradient(135deg, #CD7F32, #8B4513);
+    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+}
+
+.rank-badge.rank-other {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Month selector */
+.month-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.month-selector .btn {
+    padding: 0.375rem 0.75rem;
+}
+
+.month-selector .month-label {
+    font-weight: 600;
+    min-width: 150px;
+    text-align: center;
+}
+
+/* Tab content styling */
+.tab-content {
+    min-height: 400px;
+}
+
+/* Recent kills list */
+.recent-kills-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.recent-kills-list .killmail-row {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s;
+}
+
+.recent-kills-list .killmail-row:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.recent-kills-list .killmail-row:last-child {
+    border-bottom: none;
+}
+
+.recent-kills-list .killmail-row.is-loss {
+    border-left: 3px solid #dc3545;
+}
+
+.recent-kills-list .killmail-row.is-kill {
+    border-left: 3px solid #28a745;
+}
+
+/* My Activity tab personal stats */
+.personal-stat {
+    padding: 1.5rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.personal-stat:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.personal-stat h3 {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+/* Loading states */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.loading-spinner::after {
+    content: "";
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* DataTables customization */
+#leaderboard-table {
+    width: 100% !important;
+}
+
+#leaderboard-table td,
+#leaderboard-table th {
+    vertical-align: middle;
+}
+
+#leaderboard-table .character-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#leaderboard-table .character-portrait {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Card header tabs styling */
+.card-header .nav-tabs {
+    border-bottom: none;
+    margin-bottom: -1px;
+}
+
+.card-header .nav-tabs .nav-link {
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    background: transparent;
+    padding: 0.5rem 1rem;
+}
+
+.card-header .nav-tabs .nav-link:hover {
+    color: rgba(255, 255, 255, 0.9);
+    border: none;
+}
+
+.card-header .nav-tabs .nav-link.active {
+    color: #fff;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #007bff;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+    .stats-card .card-title {
+        font-size: 1.5rem;
+    }
+
+    .chart-container {
+        min-height: 250px;
+    }
+
+    .chart-container canvas {
+        max-height: 250px;
+    }
+
+    .top-kills-list {
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .stats-card {
+        margin-bottom: 1rem;
+    }
+
+    .month-selector {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .kill-card .ship-render img {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+/* ISK value formatting */
+.isk-positive {
+    color: #28a745;
+}
+
+.isk-negative {
+    color: #dc3545;
+}
+
+/* Efficiency bar */
+.efficiency-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.efficiency-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 3px;
+    transition: width 1s ease-out;
+}
+
+/* Header styling */
+.dashboard-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header h1 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* External link button */
+.zkill-link {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.zkill-link:hover {
+    opacity: 1;
+}

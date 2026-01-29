@@ -1,0 +1,313 @@
+{% extends 'aatps/base.html' %}
+
+{% load i18n %}
+{% load static %}
+
+{% block page_title %}
+    {% translate "Activity Dashboard" %} - {{ month_name }}
+{% endblock %}
+
+{% block dashboard_css %}
+    {% include "bundles/datatables-2-css-bs5.html" %}
+{% endblock %}
+
+{% block details %}
+<div class="container-fluid">
+    <!-- Header with month selector -->
+    <div class="dashboard-header">
+        <h1 class="display-6">
+            <i class="fas fa-crosshairs me-2"></i>
+            {% translate "Activity Dashboard" %}
+        </h1>
+        <div class="month-selector">
+            <button class="btn btn-outline-secondary btn-sm" id="prev-month" title="{% translate 'Previous Month' %}">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="month-label" id="current-month-label">{{ month_name }}</span>
+            <button class="btn btn-outline-secondary btn-sm" id="next-month" title="{% translate 'Next Month' %}"
+                {% if is_current_month %}disabled{% endif %}>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="row mb-4" id="stats-cards">
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-kills h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "Total Kills" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-kills">0</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-crosshairs fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-losses h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "Total Losses" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-losses">0</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-skull fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-isk-destroyed h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "ISK Destroyed" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-isk-destroyed">0</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-coins fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-isk-lost h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "ISK Lost" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-isk-lost">0</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-money-bill-wave fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-efficiency h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "Efficiency" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-efficiency">0%</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-percentage fa-2x"></i>
+                        </div>
+                    </div>
+                    <div class="efficiency-bar mt-2">
+                        <div class="efficiency-bar-fill" id="efficiency-bar-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white stats-card bg-pilots h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-white-50">{% translate "Active Pilots" %}</h6>
+                            <h2 class="card-title mb-0 counter" id="stat-pilots">0</h2>
+                        </div>
+                        <div class="stats-icon">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar me-2"></i>{% translate "Daily Activity" %}
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-rocket me-2"></i>{% translate "Ship Classes" %}
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="shipClassChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Row -->
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <!-- Top Kills Card -->
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-trophy me-2"></i>{% translate "Top Kills This Month" %}
+                </div>
+                <div class="card-body p-0">
+                    <div class="top-kills-list p-2" id="top-kills-list">
+                        <div class="loading-spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8 mb-4">
+            <!-- Tabbed Content: Leaderboard / Recent Activity -->
+            <div class="card h-100">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="leaderboard-tab" data-bs-toggle="tab" data-bs-target="#leaderboard" type="button" role="tab" aria-controls="leaderboard" aria-selected="true">
+                                <i class="fas fa-list-ol me-1"></i>{% translate "Leaderboard" %}
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="recent-tab" data-bs-toggle="tab" data-bs-target="#recent" type="button" role="tab" aria-controls="recent" aria-selected="false">
+                                <i class="fas fa-clock me-1"></i>{% translate "Recent Kills" %}
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="my-activity-tab" data-bs-toggle="tab" data-bs-target="#my-activity" type="button" role="tab" aria-controls="my-activity" aria-selected="false">
+                                <i class="fas fa-user me-1"></i>{% translate "My Activity" %}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- Leaderboard Tab -->
+                        <div class="tab-pane fade show active" id="leaderboard" role="tabpanel" aria-labelledby="leaderboard-tab">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="leaderboard-table" style="width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>{% translate "Pilot" %}</th>
+                                            <th class="text-center">{% translate "Kills" %}</th>
+                                            <th class="text-center">{% translate "Final Blows" %}</th>
+                                            <th class="text-end">{% translate "ISK Destroyed" %}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Recent Kills Tab -->
+                        <div class="tab-pane fade" id="recent" role="tabpanel" aria-labelledby="recent-tab">
+                            <div class="recent-kills-list" id="recent-kills-list">
+                                <div class="empty-state">
+                                    <i class="fas fa-clock"></i>
+                                    <p>{% translate "Click to load recent kills" %}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- My Activity Tab -->
+                        <div class="tab-pane fade" id="my-activity" role="tabpanel" aria-labelledby="my-activity-tab">
+                            <div class="row text-center mb-4">
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-crosshairs fa-2x text-success mb-2"></i>
+                                        <h3 id="my-kills">--</h3>
+                                        <small class="text-muted">{% translate "Kills" %}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-skull-crossbones fa-2x text-danger mb-2"></i>
+                                        <h3 id="my-losses">--</h3>
+                                        <small class="text-muted">{% translate "Losses" %}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                                        <h3 id="my-rank">--</h3>
+                                        <small class="text-muted">{% translate "Rank" %}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row text-center mb-4">
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-percentage fa-2x text-info mb-2"></i>
+                                        <h3 id="my-efficiency">--</h3>
+                                        <small class="text-muted">{% translate "Efficiency" %}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-coins fa-2x text-success mb-2"></i>
+                                        <h3 id="my-kill-value">--</h3>
+                                        <small class="text-muted">{% translate "ISK Destroyed" %}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 col-sm-6 mb-3">
+                                    <div class="personal-stat">
+                                        <i class="fas fa-rocket fa-2x text-primary mb-2"></i>
+                                        <h3 id="my-favorite-ship" class="text-truncate">--</h3>
+                                        <small class="text-muted">{% translate "Favorite Ship" %}</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="mt-4 mb-3">
+                                <i class="fas fa-history me-2"></i>{% translate "Your Recent Activity" %}
+                            </h5>
+                            <div class="recent-kills-list" id="my-recent-kills">
+                                <div class="empty-state">
+                                    <i class="fas fa-user-clock"></i>
+                                    <p>{% translate "Loading your activity..." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_js %}
+    {% include "bundles/datatables-2-js-bs5.html" %}
+
+    <script>
+        // Set up URLs and config for JavaScript
+        window.AAC_URLS = {
+            dashboard: '{% url "aatps:dashboard" %}',
+            historical: '{% url "aatps:historical" year=9999 month=99 %}',
+            stats: '{% url "aatps:stats_api" %}',
+            activity: '{% url "aatps:activity_api" %}',
+            leaderboard: '{% url "aatps:leaderboard_api" %}',
+            topKills: '{% url "aatps:top_kills_api" %}',
+            shipStats: '{% url "aatps:ship_stats_api" %}',
+            myStats: '{% url "aatps:my_stats_api" %}',
+            recentKills: '{% url "aatps:recent_kills_api" %}'
+        };
+        window.AAC_CURRENT_YEAR = {{ year }};
+        window.AAC_CURRENT_MONTH = {{ month }};
+    </script>
+    <script src="{% static 'aatps/js/dashboard.js' %}"></script>
+{% endblock %}

@@ -1,5 +1,5 @@
-appname = aacampaign
-package = aacampaign
+appname = aatps
+package = aatps
 
 # Default goal
 .DEFAULT_GOAL := help

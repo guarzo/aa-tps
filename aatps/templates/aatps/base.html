@@ -1,0 +1,31 @@
+{% extends 'allianceauth/base-bs5.html' %}
+
+{% load i18n %}
+{% load static %}
+
+{% block page_title %}
+    {% translate "Activity Dashboard" %}
+{% endblock %}
+
+{% block header_nav_brand %}
+    {% translate "Activity Dashboard" %}
+{% endblock header_nav_brand %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'aatps/css/dashboard.css' %}">
+    {% block dashboard_css %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+    <div class="aa-tps">
+        {% block details %}{% endblock %}
+    </div>
+{% endblock %}
+
+{% block extra_javascript %}
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Chart.js date adapter for time series -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    {% block dashboard_js %}{% endblock %}
+{% endblock %}
