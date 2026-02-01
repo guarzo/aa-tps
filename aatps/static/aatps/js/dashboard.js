@@ -639,9 +639,13 @@
         if (isCurrentMonth) {
             window.location.href = window.AAC_URLS.dashboard;
         } else {
-            window.location.href = window.AAC_URLS.historical
-                .replace('9999', newYear)
-                .replace('99', newMonth);
+            // Build the historical URL by replacing placeholders
+            // Placeholders: 8888 for year, 88 for month
+            // Use regex with slashes to ensure we match the exact path segments
+            let historicalUrl = window.AAC_URLS.historical;
+            historicalUrl = historicalUrl.replace(/\/8888\//, '/' + newYear + '/');
+            historicalUrl = historicalUrl.replace(/\/88\//, '/' + newMonth + '/');
+            window.location.href = historicalUrl;
         }
     }
 
